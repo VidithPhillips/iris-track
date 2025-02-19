@@ -3,7 +3,7 @@
 A real-time face and iris tracking application using MediaPipe and WebRTC.
 
 ## Live Demo
-Visit [https://VidithPhillips.github.io/face-iris-tracker](https://VidithPhillips.github.io/face-iris-tracker)
+Visit [https://VidithPhillips.github.io/iris-track](https://VidithPhillips.github.io/iris-track)
 
 ## Features
 - Real-time face mesh tracking
