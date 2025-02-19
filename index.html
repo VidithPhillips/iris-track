@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face & Iris Tracking</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+</head>
+<body>
+    <div class="container">
+        <video class="input-video" width="640" height="480" autoplay></video>
+        <canvas class="output-canvas" width="640" height="480"></canvas>
+    </div>
+    <script src="js/faceTracking.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html> 

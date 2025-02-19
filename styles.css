@@ -1,0 +1,17 @@
+.container {
+    position: relative;
+    width: 640px;
+    height: 480px;
+    margin: 0 auto;
+}
+
+.input-video {
+    position: absolute;
+    display: none;
+}
+
+.output-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+} 
