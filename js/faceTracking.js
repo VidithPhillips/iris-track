@@ -12,6 +12,10 @@ class FaceTracker {
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
+
+        // Add known measurements for distance calculation
+        this.KNOWN_FACE_WIDTH = 0.15; // Average face width in meters
+        this.FOCAL_LENGTH = 615; // Focal length in pixels (can be calibrated)
     }
 
     async initialize(videoElement, canvasElement) {
@@ -53,6 +57,10 @@ class FaceTracker {
                 
                 this.drawIris(leftIris, '#30FF30');
                 this.drawIris(rightIris, '#FF3030');
+
+                // Calculate and display distance
+                const distance = this.calculateDistance(landmarks);
+                this.displayDistance(distance);
             }
         }
     }
@@ -71,5 +79,28 @@ class FaceTracker {
 
         this.ctx.closePath();
         this.ctx.stroke();
+    }
+
+    calculateDistance(landmarks) {
+        // Get face width in pixels using temple points
+        const leftTemple = landmarks[234];
+        const rightTemple = landmarks[454];
+        
+        const faceWidthPixels = Math.hypot(
+            (rightTemple.x - leftTemple.x) * this.canvas.width,
+            (rightTemple.y - leftTemple.y) * this.canvas.height
+        );
+
+        // Use similar triangles formula: Distance = (Known width × Focal length) / Pixel width
+        const distance = (this.KNOWN_FACE_WIDTH * this.FOCAL_LENGTH) / faceWidthPixels;
+        return distance;
+    }
+
+    displayDistance(distance) {
+        this.ctx.font = '24px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.fillRect(10, 10, 250, 35);
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillText(`Distance: ${distance.toFixed(2)} meters`, 20, 35);
     }
 } 
