@@ -15,15 +15,22 @@ function showStatus(message) {
     setTimeout(() => statusEl.classList.add('hidden'), 3000);
 }
 
-async function requestCameraPermission() {
+async function requestCameraPermission(video) {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: {
+                width: 640,
+                height: 480
+            } 
+        });
+        video.srcObject = stream;
+        await video.play();
         document.getElementById('permissionOverlay').classList.add('hidden');
-        return stream;
+        return true;
     } catch (error) {
         console.error('Camera permission error:', error);
         showStatus('Camera access denied. Please allow camera access and refresh the page.');
-        return null;
+        return false;
     }
 }
 
@@ -41,11 +48,13 @@ async function initialize() {
         // Set up permission button
         const permissionBtn = document.getElementById('requestPermission');
         permissionBtn.addEventListener('click', async () => {
-            const stream = await requestCameraPermission();
-            if (stream) {
-                // Initialize face tracker after permission granted
+            const permissionGranted = await requestCameraPermission(video);
+            if (permissionGranted) {
                 faceTracker = new FaceTracker();
                 await faceTracker.initialize(video, canvas);
+
+                // Show calibration overlay after camera starts
+                document.getElementById('calibrationOverlay').classList.remove('hidden');
                 
                 // Set up calibration button
                 const calibrateBtn = document.getElementById('calibrateBtn');
@@ -74,5 +83,4 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Wait for DOM to load
 document.addEventListener('DOMContentLoaded', initialize); 

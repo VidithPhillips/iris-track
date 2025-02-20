@@ -97,23 +97,22 @@ class FaceTracker {
 
         this.holistic.onResults(this.onResults.bind(this));
 
-        this.camera = new Camera(this.video, {
-            onFrame: async () => {
-                try {
+        // Remove Camera Utils and use direct video feed
+        try {
+            await this.holistic.send({image: this.video});
+            
+            // Start processing frames
+            const processFrame = async () => {
+                if (this.video.videoWidth > 0) {
                     await this.holistic.send({image: this.video});
-                    this.errorCount = 0;
-                } catch (error) {
-                    this.errorCount++;
-                    if (this.errorCount >= this.maxErrors) {
-                        this.showError('Face tracking failed. Please refresh the page.');
-                    }
                 }
-            },
-            width: 640,
-            height: 480
-        });
-
-        await this.camera.start();
+                requestAnimationFrame(processFrame);
+            };
+            processFrame();
+        } catch (error) {
+            console.error('Holistic initialization failed:', error);
+            throw error;
+        }
     }
 
     showError(message) {
@@ -123,9 +122,6 @@ class FaceTracker {
     }
 
     cleanup() {
-        if (this.camera) {
-            this.camera.stop();
-        }
         if (this.holistic) {
             this.holistic.close();
         }
