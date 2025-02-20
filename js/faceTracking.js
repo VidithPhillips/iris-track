@@ -40,13 +40,24 @@ class FaceTracker {
             yaw: 0,
             roll: 0
         };
-        this.angleSmoothingFactor = 0.85; // Higher = smoother but more latency
+        this.angleSmoothingFactor = 0.92; // Increased for more stability
 
         // Reference axes colors
         this.axesColors = {
             x: '#FF0000', // Sagittal plane (red)
             y: '#00FF00', // Coronal plane (green)
             z: '#0000FF'  // Transverse plane (blue)
+        };
+
+        // Add 3D visualization parameters
+        this.visualization3D = {
+            scale: 100,
+            lineWidth: 2,
+            colors: {
+                sagittal: '#FF4444',
+                coronal: '#44FF44',
+                transverse: '#4444FF'
+            }
         };
     }
 
@@ -101,19 +112,13 @@ class FaceTracker {
 
             // If we have both pose and face landmarks, calculate head pose
             if (results.poseLandmarks) {
-                // Calculate head pose angles
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
                 
-                // Draw body pose first (background)
+                // Draw visualization elements in correct order
                 this.drawBodyPose(results.poseLandmarks);
-                
-                // Draw neck line and direction indicator
+                this.draw3DPlanes(results.faceLandmarks);
                 this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
-                
-                // Draw reference axes in top-right corner
                 this.drawReferenceAxes();
-                
-                // Display head pose angles with color coding
                 this.displayHeadPose();
             }
         }
@@ -325,7 +330,10 @@ class FaceTracker {
     }
 
     smoothAngle(current, previous) {
-        return previous * this.angleSmoothingFactor + current * (1 - this.angleSmoothingFactor);
+        // Handle angle wrapping
+        const diff = current - previous;
+        const wrapped = diff - Math.round(diff / 360) * 360;
+        return previous + wrapped * (1 - this.angleSmoothingFactor);
     }
 
     drawReferenceAxes() {
@@ -414,5 +422,84 @@ class FaceTracker {
         this.ctx.stroke();
 
         this.ctx.restore();
+    }
+
+    // Add new method for 3D plane visualization
+    draw3DPlanes(faceLandmarks) {
+        const nose = faceLandmarks[1];
+        const noseX = nose.x * this.canvas.width;
+        const noseY = nose.y * this.canvas.height;
+        
+        this.ctx.save();
+        this.ctx.translate(noseX, noseY);
+        
+        // Apply head rotation
+        const rotationMatrix = this.create3DRotationMatrix(
+            this.headPose.pitch,
+            this.headPose.yaw,
+            this.headPose.roll
+        );
+        
+        // Draw sagittal plane (red)
+        this.ctx.strokeStyle = this.visualization3D.colors.sagittal;
+        this.ctx.lineWidth = this.visualization3D.lineWidth;
+        this.drawPlane(rotationMatrix, [1, 0, 0]);
+        
+        // Draw coronal plane (green)
+        this.ctx.strokeStyle = this.visualization3D.colors.coronal;
+        this.drawPlane(rotationMatrix, [0, 1, 0]);
+        
+        // Draw transverse plane (blue)
+        this.ctx.strokeStyle = this.visualization3D.colors.transverse;
+        this.drawPlane(rotationMatrix, [0, 0, 1]);
+        
+        this.ctx.restore();
+    }
+
+    create3DRotationMatrix(pitch, yaw, roll) {
+        const cp = Math.cos(pitch * Math.PI / 180);
+        const sp = Math.sin(pitch * Math.PI / 180);
+        const cy = Math.cos(yaw * Math.PI / 180);
+        const sy = Math.sin(yaw * Math.PI / 180);
+        const cr = Math.cos(roll * Math.PI / 180);
+        const sr = Math.sin(roll * Math.PI / 180);
+        
+        return [
+            [cy * cr, -cy * sr, sy],
+            [cp * sr + sp * sy * cr, cp * cr - sp * sy * sr, -sp * cy],
+            [sp * sr - cp * sy * cr, sp * cr + cp * sy * sr, cp * cy]
+        ];
+    }
+
+    drawPlane(matrix, normal) {
+        const scale = this.visualization3D.scale;
+        const points = [
+            [-scale, -scale, 0],
+            [scale, -scale, 0],
+            [scale, scale, 0],
+            [-scale, scale, 0]
+        ];
+        
+        this.ctx.beginPath();
+        points.forEach((point, i) => {
+            const projected = this.projectPoint(matrix, point);
+            if (i === 0) {
+                this.ctx.moveTo(projected[0], projected[1]);
+            } else {
+                this.ctx.lineTo(projected[0], projected[1]);
+            }
+        });
+        this.ctx.closePath();
+        this.ctx.stroke();
+    }
+
+    projectPoint(matrix, point) {
+        const result = [0, 0, 0];
+        for (let i = 0; i < 3; i++) {
+            result[i] = matrix[i][0] * point[0] + 
+                       matrix[i][1] * point[1] + 
+                       matrix[i][2] * point[2];
+        }
+        return [result[0], result[1]];
     }
 } 
