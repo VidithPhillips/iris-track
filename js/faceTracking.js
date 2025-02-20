@@ -34,10 +34,28 @@ class FaceTracker {
             selfieMode: true
         });
 
-        // Simple color scheme
+        // Tracking parameters
+        this.previousLandmarks = null;
+        this.smoothingFactor = 0.7;
+        this.backgroundAlpha = 0.3;
+
+        // Head pose parameters
+        this.headPose = {
+            pitch: 0,
+            yaw: 0,
+            roll: 0
+        };
+
+        // Color scheme
         this.colors = {
             primary: '#00E676',
             text: '#FFFFFF',
+            face: {
+                mesh: 'rgba(255, 255, 255, 0.1)',
+                outline: 'rgba(255, 255, 255, 0.3)',
+                eyes: '#00E676',
+                iris: '#FFD700'
+            },
             axis: {
                 x: '#FF4444',  // Red for left/right
                 y: '#44FF44',  // Green for up/down
@@ -67,13 +85,17 @@ class FaceTracker {
     onResults(results) {
         // Clear canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${this.backgroundAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (results.faceLandmarks) {
             // Draw face mesh
+            this.drawFaceOutline(results.faceLandmarks);
             drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
-                {color: 'rgba(255,255,255,0.2)', lineWidth: 1});
+                {color: this.colors.face.mesh, lineWidth: 1});
+            
+            // Draw eyes
+            this.drawEnhancedEyes(results.faceLandmarks);
 
             if (results.poseLandmarks) {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
@@ -81,6 +103,34 @@ class FaceTracker {
                 this.displayHeadPose();
             }
         }
+    }
+
+    drawFaceOutline(landmarks) {
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.colors.face.outline;
+        this.ctx.lineWidth = 2;
+        
+        // Face outline points
+        const outlinePoints = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+        
+        const firstPoint = landmarks[outlinePoints[0]];
+        this.ctx.moveTo(firstPoint.x * this.canvas.width, firstPoint.y * this.canvas.height);
+        
+        outlinePoints.forEach(index => {
+            const point = landmarks[index];
+            this.ctx.lineTo(point.x * this.canvas.width, point.y * this.canvas.height);
+        });
+
+        this.ctx.closePath();
+        this.ctx.stroke();
+    }
+
+    drawEnhancedEyes(landmarks) {
+        // Draw eyes
+        drawConnectors(this.ctx, landmarks, FACEMESH_RIGHT_EYE, 
+            {color: this.colors.face.eyes, lineWidth: 2});
+        drawConnectors(this.ctx, landmarks, FACEMESH_LEFT_EYE,
+            {color: this.colors.face.eyes, lineWidth: 2});
     }
 
     calculateHeadPose(poseLandmarks, faceLandmarks) {
