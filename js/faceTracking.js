@@ -1,14 +1,17 @@
 class FaceTracker {
     constructor() {
-        this.faceMesh = new FaceMesh({
+        this.holistic = new Holistic({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
             }
         });
 
-        this.faceMesh.setOptions({
-            maxNumFaces: 1,
-            refineLandmarks: true,
+        this.holistic.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: true,
+            smoothSegmentation: true,
+            refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
@@ -21,6 +24,13 @@ class FaceTracker {
         this.previousLandmarks = null;
         this.smoothingFactor = 0.7; // Adjust for more/less smoothing
         this.backgroundAlpha = 0.3; // Background darkness
+
+        // Add head pose parameters
+        this.headPose = {
+            pitch: 0, // X-axis rotation (nodding)
+            yaw: 0,   // Y-axis rotation (turning)
+            roll: 0   // Z-axis rotation (tilting)
+        };
     }
 
     async initialize(videoElement, canvasElement) {
@@ -28,11 +38,11 @@ class FaceTracker {
         this.canvas = canvasElement;
         this.ctx = canvasElement.getContext('2d');
 
-        this.faceMesh.onResults(this.onResults.bind(this));
+        this.holistic.onResults(this.onResults.bind(this));
 
         this.camera = new Camera(this.video, {
             onFrame: async () => {
-                await this.faceMesh.send({image: this.video});
+                await this.holistic.send({image: this.video});
             },
             width: 640,
             height: 480
@@ -72,6 +82,15 @@ class FaceTracker {
                 const distance = this.calculateDistance(smoothedLandmarks);
                 this.displayDistance(distance);
             }
+        }
+
+        if (results.poseLandmarks && results.faceLandmarks) {
+            // Calculate head pose relative to body
+            this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
+            this.displayHeadPose();
+
+            // Draw body pose landmarks
+            this.drawBodyPose(results.poseLandmarks);
         }
     }
 
@@ -172,5 +191,87 @@ class FaceTracker {
         this.ctx.fillRect(10, 10, 250, 35);
         this.ctx.fillStyle = '#000000';
         this.ctx.fillText(`Distance: ${distance.toFixed(2)} meters`, 20, 35);
+    }
+
+    calculateHeadPose(poseLandmarks, faceLandmarks) {
+        // Get body midline (using shoulders)
+        const leftShoulder = poseLandmarks[11];
+        const rightShoulder = poseLandmarks[12];
+        const bodyMidline = {
+            x: (leftShoulder.x + rightShoulder.x) / 2,
+            y: (leftShoulder.y + rightShoulder.y) / 2,
+            z: (leftShoulder.z + rightShoulder.z) / 2
+        };
+
+        // Get head midline points
+        const nose = faceLandmarks[1];
+        const midEyes = {
+            x: (faceLandmarks[33].x + faceLandmarks[133].x) / 2,
+            y: (faceLandmarks[33].y + faceLandmarks[133].y) / 2,
+            z: (faceLandmarks[33].z + faceLandmarks[133].z) / 2
+        };
+
+        // Calculate angles
+        this.headPose.yaw = this.calculateYawAngle(bodyMidline, nose);
+        this.headPose.pitch = this.calculatePitchAngle(bodyMidline, nose, midEyes);
+        this.headPose.roll = this.calculateRollAngle(faceLandmarks[33], faceLandmarks[133]);
+    }
+
+    calculateYawAngle(bodyMidline, nose) {
+        // Calculate horizontal rotation (left/right turning)
+        const dx = nose.x - bodyMidline.x;
+        const dz = nose.z - bodyMidline.z;
+        return Math.atan2(dx, dz) * (180 / Math.PI);
+    }
+
+    calculatePitchAngle(bodyMidline, nose, midEyes) {
+        // Calculate vertical rotation (nodding)
+        const dy = nose.y - midEyes.y;
+        const dz = nose.z - midEyes.z;
+        return Math.atan2(dy, dz) * (180 / Math.PI);
+    }
+
+    calculateRollAngle(leftEye, rightEye) {
+        // Calculate roll (head tilt)
+        const dx = rightEye.x - leftEye.x;
+        const dy = rightEye.y - leftEye.y;
+        return Math.atan2(dy, dx) * (180 / Math.PI);
+    }
+
+    displayHeadPose() {
+        const yOffset = 50;
+        this.ctx.font = '16px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        
+        // Display angles
+        this.ctx.fillRect(10, yOffset, 200, 80);
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 20);
+        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 40);
+        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 60);
+    }
+
+    drawBodyPose(poseLandmarks) {
+        // Draw body pose landmarks
+        this.ctx.fillStyle = '#00FF00';
+        for (const landmark of poseLandmarks) {
+            const x = landmark.x * this.canvas.width;
+            const y = landmark.y * this.canvas.height;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            this.ctx.fill();
+        }
+
+        // Draw shoulder line as reference
+        const leftShoulder = poseLandmarks[11];
+        const rightShoulder = poseLandmarks[12];
+        
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = '#00FF00';
+        this.ctx.lineWidth = 2;
+        this.ctx.moveTo(leftShoulder.x * this.canvas.width, leftShoulder.y * this.canvas.height);
+        this.ctx.lineTo(rightShoulder.x * this.canvas.width, rightShoulder.y * this.canvas.height);
+        this.ctx.stroke();
     }
 } 
