@@ -5,22 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Head Tracking Visualization</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Restore original working versions -->
+    <!-- Ensure MediaPipe scripts are loaded first -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.5.1675469404/holistic.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466862/drawing_utils.js"></script>
 </head>
 <body>
     <div class="container">
-        <div class="permission-overlay" id="permissionOverlay">
-            <div class="permission-content">
-                <h3>Camera Access Required</h3>
-                <p>Please allow camera access to use this application.</p>
-                <button id="requestPermission">Enable Camera</button>
-            </div>
-        </div>
-        <!-- Add crossorigin for video -->
-        <video class="input-video" width="640" height="480" autoplay playsinline muted crossorigin="anonymous"></video>
+        <video class="input-video" width="640" height="480" autoplay playsinline muted></video>
         <canvas class="output-canvas" width="640" height="480"></canvas>
         <div class="calibration-overlay hidden" id="calibrationOverlay">
             <div class="calibration-content">
@@ -32,6 +24,7 @@
         </div>
         <div class="status-message hidden" id="statusMessage"></div>
     </div>
+    <!-- Load custom scripts after MediaPipe -->
     <script src="js/faceTracking.js"></script>
     <script src="js/main.js"></script>
 </body>
