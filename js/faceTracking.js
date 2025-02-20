@@ -17,6 +17,15 @@ const FACEMESH_LEFT_EYE = [
     [398, 362]
 ];
 
+// Add hand mesh connections
+const HAND_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [3, 4], // thumb
+    [0, 5], [5, 6], [6, 7], [7, 8], // index
+    [0, 9], [9, 10], [10, 11], [11, 12], // middle
+    [0, 13], [13, 14], [14, 15], [15, 16], // ring
+    [0, 17], [17, 18], [18, 19], [19, 20] // pinky
+];
+
 class FaceTracker {
     constructor() {
         this.holistic = new Holistic({
@@ -83,19 +92,78 @@ class FaceTracker {
             }
         };
 
-        // Define body connections for better visualization
+        // Enhanced tracking parameters
+        this.tracking = {
+            face: {
+                mesh: true,
+                iris: true,
+                expressions: true
+            },
+            body: {
+                pose: true,
+                hands: true
+            }
+        };
+
+        // Enhanced visualization parameters
+        this.visualization = {
+            face: {
+                meshOpacity: 0.5,
+                contourWidth: 2,
+                irisDetail: true
+            },
+            body: {
+                jointRadius: 4,
+                lineWidth: 2,
+                showLabels: true
+            },
+            hands: {
+                meshOpacity: 0.6,
+                jointRadius: 3,
+                lineWidth: 1.5
+            }
+        };
+
+        // Extended body connections for more detail
         this.bodyConnections = [
             // Torso
-            [11, 12], // shoulders
-            [11, 23], [12, 24], // shoulders to hips
-            [23, 24], // hips
-            // Arms
-            [11, 13], [13, 15], // left arm
-            [12, 14], [14, 16], // right arm
-            // Legs
-            [23, 25], [25, 27], // left leg
-            [24, 26], [26, 28]  // right leg
+            [11, 12], [12, 24], [24, 23], [23, 11], // chest
+            [11, 13], [13, 15], [15, 17], [17, 19], // left arm
+            [12, 14], [14, 16], [16, 18], [18, 20], // right arm
+            [23, 25], [25, 27], [27, 29], [29, 31], // left leg
+            [24, 26], [26, 28], [28, 30], [30, 32], // right leg
+            // Face connections
+            [0, 1], [1, 2], [2, 3], [3, 7], // face outline
+            [0, 4], [4, 5], [5, 6], [6, 8]  // face detail
         ];
+
+        // Facial expression detection
+        this.expressions = {
+            lastBlink: { left: false, right: false },
+            mouthOpen: false,
+            smile: false
+        };
+
+        // Movement tracking
+        this.movementHistory = {
+            positions: [],
+            maxLength: 30,  // Store last 30 frames
+            speed: 0
+        };
+
+        // Gaze tracking
+        this.gazeTracking = {
+            direction: { x: 0, y: 0 },
+            confidence: 0,
+            target: null
+        };
+
+        // Distance tracking
+        this.distanceTracking = {
+            current: 0,
+            history: [],
+            calibrated: false
+        };
     }
 
     async initialize(videoElement, canvasElement) {
@@ -123,20 +191,33 @@ class FaceTracker {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (results.faceLandmarks) {
-            // Draw face mesh
+            this.drawEnhancedFace(results.faceLandmarks);
             this.drawFaceOutline(results.faceLandmarks);
-            drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
-                {color: this.colors.face.mesh, lineWidth: 1});
             
-            // Draw eyes
-            this.drawEnhancedEyes(results.faceLandmarks);
+            // Enhanced eye tracking
+            if (results.faceLandmarks.length > 468) {
+                this.drawEnhancedEyes(results.faceLandmarks);
+            }
+
+            // Add new feature tracking
+            this.detectFacialExpressions(results.faceLandmarks);
+            this.trackGazeDirection(results.faceLandmarks);
+            this.trackMovement(results.faceLandmarks);
+            
+            // Draw new visualizations
+            this.drawGazeIndicator();
+            this.drawMovementTrail();
+            this.drawExpressionIndicators();
 
             if (results.poseLandmarks) {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
-                this.drawDetailedBody(results.poseLandmarks);  // Add detailed body tracking
+                this.drawDetailedBody(results.poseLandmarks);
                 this.drawHeadAxes();
                 this.displayHeadPose();
             }
+
+            // Add hand tracking
+            this.drawHands(results.leftHandLandmarks, results.rightHandLandmarks);
         }
     }
 
@@ -177,40 +258,49 @@ class FaceTracker {
     drawIris(irisLandmarks) {
         if (irisLandmarks.length < 4) return;
 
-        // Calculate iris center
-        const centerX = irisLandmarks.reduce((sum, pt) => sum + pt.x, 0) / irisLandmarks.length;
-        const centerY = irisLandmarks.reduce((sum, pt) => sum + pt.y, 0) / irisLandmarks.length;
+        const center = {
+            x: irisLandmarks.reduce((sum, pt) => sum + pt.x, 0) / irisLandmarks.length,
+            y: irisLandmarks.reduce((sum, pt) => sum + pt.y, 0) / irisLandmarks.length
+        };
 
-        // Calculate iris size
-        const distance = Math.hypot(
+        const radius = Math.hypot(
             (irisLandmarks[0].x - irisLandmarks[2].x) * this.canvas.width,
             (irisLandmarks[0].y - irisLandmarks[2].y) * this.canvas.height
-        );
+        ) / 2;
 
-        // Draw iris
+        // Draw iris with gradient
+        const gradient = this.ctx.createRadialGradient(
+            center.x * this.canvas.width, center.y * this.canvas.height, 0,
+            center.x * this.canvas.width, center.y * this.canvas.height, radius
+        );
+        gradient.addColorStop(0, 'rgba(255, 215, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(255, 215, 0, 0.2)');
+
         this.ctx.beginPath();
         this.ctx.arc(
-            centerX * this.canvas.width,
-            centerY * this.canvas.height,
-            distance/2,
+            center.x * this.canvas.width,
+            center.y * this.canvas.height,
+            radius,
             0,
             2 * Math.PI
         );
-        this.ctx.strokeStyle = this.irisParams.color;
-        this.ctx.lineWidth = 2;
-        this.ctx.stroke();
-
-        // Draw pupil
-        this.ctx.beginPath();
-        this.ctx.arc(
-            centerX * this.canvas.width,
-            centerY * this.canvas.height,
-            distance/4,
-            0,
-            2 * Math.PI
-        );
-        this.ctx.fillStyle = this.irisParams.pupilColor;
+        this.ctx.fillStyle = gradient;
         this.ctx.fill();
+
+        // Draw pupil with shadow
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.shadowBlur = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(
+            center.x * this.canvas.width,
+            center.y * this.canvas.height,
+            radius * 0.4,
+            0,
+            2 * Math.PI
+        );
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
     }
 
     calculateHeadPose(poseLandmarks, faceLandmarks) {
@@ -334,5 +424,189 @@ class FaceTracker {
             this.ctx.lineWidth = this.bodyParams.connections.width;
             this.ctx.stroke();
         });
+    }
+
+    drawEnhancedFace(landmarks) {
+        // Draw face mesh with depth shading
+        this.ctx.strokeStyle = this.colors.face.mesh;
+        landmarks.forEach((point, i) => {
+            const depth = point.z;
+            const opacity = Math.max(0.1, Math.min(0.9, 1 - Math.abs(depth)));
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(
+                point.x * this.canvas.width,
+                point.y * this.canvas.height,
+                1,
+                0,
+                2 * Math.PI
+            );
+            this.ctx.fill();
+        });
+    }
+
+    drawHands(leftHand, rightHand) {
+        const drawHand = (landmarks, isLeft) => {
+            if (!landmarks) return;
+
+            // Draw connections
+            this.ctx.strokeStyle = isLeft ? 
+                'rgba(0, 230, 118, 0.5)' : 
+                'rgba(255, 215, 0, 0.5)';
+            this.ctx.lineWidth = this.visualization.hands.lineWidth;
+
+            HAND_CONNECTIONS.forEach(([i, j]) => {
+                this.ctx.beginPath();
+                this.ctx.moveTo(
+                    landmarks[i].x * this.canvas.width,
+                    landmarks[i].y * this.canvas.height
+                );
+                this.ctx.lineTo(
+                    landmarks[j].x * this.canvas.width,
+                    landmarks[j].y * this.canvas.height
+                );
+                this.ctx.stroke();
+            });
+
+            // Draw joints
+            landmarks.forEach((landmark, index) => {
+                this.ctx.beginPath();
+                this.ctx.arc(
+                    landmark.x * this.canvas.width,
+                    landmark.y * this.canvas.height,
+                    this.visualization.hands.jointRadius,
+                    0,
+                    2 * Math.PI
+                );
+                this.ctx.fillStyle = isLeft ? '#00E676' : '#FFD700';
+                this.ctx.fill();
+            });
+        };
+
+        drawHand(leftHand, true);
+        drawHand(rightHand, false);
+    }
+
+    // Add new methods for enhanced features
+    detectFacialExpressions(landmarks) {
+        // Detect eye blink
+        const leftEyeTop = landmarks[159];
+        const leftEyeBottom = landmarks[145];
+        const rightEyeTop = landmarks[386];
+        const rightEyeBottom = landmarks[374];
+        
+        const leftEyeDistance = Math.abs(leftEyeTop.y - leftEyeBottom.y);
+        const rightEyeDistance = Math.abs(rightEyeTop.y - rightEyeBottom.y);
+        
+        this.expressions.lastBlink = {
+            left: leftEyeDistance < 0.02,
+            right: rightEyeDistance < 0.02
+        };
+
+        // Detect mouth open
+        const upperLip = landmarks[13];
+        const lowerLip = landmarks[14];
+        this.expressions.mouthOpen = Math.abs(upperLip.y - lowerLip.y) > 0.05;
+
+        // Detect smile
+        const leftMouth = landmarks[61];
+        const rightMouth = landmarks[291];
+        const mouthCenter = landmarks[0];
+        this.expressions.smile = (leftMouth.y + rightMouth.y) / 2 < mouthCenter.y;
+    }
+
+    trackGazeDirection(landmarks) {
+        const leftIris = landmarks.slice(468, 472);
+        const rightIris = landmarks.slice(473, 477);
+        
+        // Calculate average iris positions
+        const leftCenter = this.getCenter(leftIris);
+        const rightCenter = this.getCenter(rightIris);
+        
+        // Calculate gaze direction relative to face orientation
+        this.gazeTracking.direction = {
+            x: (leftCenter.x + rightCenter.x) / 2,
+            y: (leftCenter.y + rightCenter.y) / 2
+        };
+    }
+
+    drawGazeIndicator() {
+        if (!this.gazeTracking.direction) return;
+
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const radius = 100;
+
+        // Draw gaze direction indicator
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.stroke();
+
+        // Draw gaze point
+        const x = centerX + this.gazeTracking.direction.x * radius;
+        const y = centerY + this.gazeTracking.direction.y * radius;
+        
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, 5, 0, 2 * Math.PI);
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.fill();
+    }
+
+    trackMovement(landmarks) {
+        const nose = landmarks[1];
+        const currentPos = { x: nose.x, y: nose.y, timestamp: Date.now() };
+        
+        this.movementHistory.positions.push(currentPos);
+        if (this.movementHistory.positions.length > this.movementHistory.maxLength) {
+            this.movementHistory.positions.shift();
+        }
+
+        // Calculate movement speed
+        if (this.movementHistory.positions.length > 1) {
+            const latest = this.movementHistory.positions[this.movementHistory.positions.length - 1];
+            const previous = this.movementHistory.positions[this.movementHistory.positions.length - 2];
+            
+            const distance = Math.hypot(latest.x - previous.x, latest.y - previous.y);
+            const time = (latest.timestamp - previous.timestamp) / 1000; // Convert to seconds
+            this.movementHistory.speed = distance / time;
+        }
+    }
+
+    drawMovementTrail() {
+        if (this.movementHistory.positions.length < 2) return;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(
+            this.movementHistory.positions[0].x * this.canvas.width,
+            this.movementHistory.positions[0].y * this.canvas.height
+        );
+
+        for (let i = 1; i < this.movementHistory.positions.length; i++) {
+            const pos = this.movementHistory.positions[i];
+            this.ctx.lineTo(pos.x * this.canvas.width, pos.y * this.canvas.height);
+        }
+
+        this.ctx.strokeStyle = `rgba(0, 230, 118, ${0.5 * (this.movementHistory.speed + 0.1)})`;
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+    }
+
+    drawExpressionIndicators() {
+        const startY = 100;
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+
+        // Display blink status
+        this.ctx.fillText(`Left Eye: ${this.expressions.lastBlink.left ? 'Closed' : 'Open'}`, 20, startY);
+        this.ctx.fillText(`Right Eye: ${this.expressions.lastBlink.right ? 'Closed' : 'Open'}`, 20, startY + 20);
+        
+        // Display mouth and smile status
+        this.ctx.fillText(`Mouth: ${this.expressions.mouthOpen ? 'Open' : 'Closed'}`, 20, startY + 40);
+        this.ctx.fillText(`Expression: ${this.expressions.smile ? 'Smiling' : 'Neutral'}`, 20, startY + 60);
+        
+        // Display movement speed
+        this.ctx.fillText(`Movement Speed: ${this.movementHistory.speed.toFixed(3)}`, 20, startY + 80);
     }
 } 
