@@ -9,11 +9,12 @@ class FaceTracker {
         this.holistic.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
-            enableSegmentation: true,
+            enableSegmentation: false,
             smoothSegmentation: true,
             refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minTrackingConfidence: 0.5,
+            selfieMode: true  // Add this if camera is mirrored
         });
 
         // Add known measurements for distance calculation
@@ -56,41 +57,38 @@ class FaceTracker {
         this.ctx.fillStyle = `rgba(0, 0, 0, ${this.backgroundAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        if (results.multiFaceLandmarks) {
-            for (const landmarks of results.multiFaceLandmarks) {
-                // Apply smoothing to landmarks
-                const smoothedLandmarks = this.smoothLandmarks(landmarks);
-                
-                // Create face outline for better visual context
-                this.drawFaceOutline(smoothedLandmarks);
+        // Check for face mesh results from holistic
+        if (results.faceLandmarks) {
+            // Apply smoothing to landmarks
+            const smoothedLandmarks = this.smoothLandmarks(results.faceLandmarks);
+            
+            // Create face outline for better visual context
+            this.drawFaceOutline(smoothedLandmarks);
 
-                // Draw face mesh with reduced opacity
-                drawConnectors(this.ctx, smoothedLandmarks, FACEMESH_TESSELATION, 
-                    {color: '#C0C0C030', lineWidth: 0.5});
-                
-                // Draw eyes with enhanced visibility
-                this.drawEnhancedEyes(smoothedLandmarks);
+            // Draw face mesh with reduced opacity
+            drawConnectors(this.ctx, smoothedLandmarks, FACEMESH_TESSELATION, 
+                {color: '#C0C0C030', lineWidth: 0.5});
+            
+            // Draw eyes with enhanced visibility
+            this.drawEnhancedEyes(smoothedLandmarks);
 
-                // Draw iris with glow effect
-                const leftIris = smoothedLandmarks.slice(468, 472);
-                const rightIris = smoothedLandmarks.slice(473, 477);
-                
-                this.drawEnhancedIris(leftIris, '#30FF30');
-                this.drawEnhancedIris(rightIris, '#FF3030');
+            // Draw iris
+            const leftIris = smoothedLandmarks.slice(468, 472);
+            const rightIris = smoothedLandmarks.slice(473, 477);
+            
+            this.drawEnhancedIris(leftIris, '#30FF30');
+            this.drawEnhancedIris(rightIris, '#FF3030');
 
-                // Calculate and display distance
-                const distance = this.calculateDistance(smoothedLandmarks);
-                this.displayDistance(distance);
+            // Calculate and display distance
+            const distance = this.calculateDistance(smoothedLandmarks);
+            this.displayDistance(distance);
+
+            // If we have both pose and face landmarks, calculate head pose
+            if (results.poseLandmarks) {
+                this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
+                this.displayHeadPose();
+                this.drawBodyPose(results.poseLandmarks);
             }
-        }
-
-        if (results.poseLandmarks && results.faceLandmarks) {
-            // Calculate head pose relative to body
-            this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
-            this.displayHeadPose();
-
-            // Draw body pose landmarks
-            this.drawBodyPose(results.poseLandmarks);
         }
     }
 
@@ -241,37 +239,54 @@ class FaceTracker {
     displayHeadPose() {
         const yOffset = 50;
         this.ctx.font = '16px Arial';
-        this.ctx.fillStyle = '#FFFFFF';
         
-        // Display angles
-        this.ctx.fillRect(10, yOffset, 200, 80);
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 20);
-        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 40);
-        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 60);
+        // Create background for better visibility
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(10, yOffset, 200, 90);
+        
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.fillText(`Head Pose Angles:`, 20, yOffset + 20);
+        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 40);
+        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 60);
+        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 80);
     }
 
     drawBodyPose(poseLandmarks) {
-        // Draw body pose landmarks
+        // Make body landmarks more visible
         this.ctx.fillStyle = '#00FF00';
+        this.ctx.strokeStyle = '#00FF00';
+        this.ctx.lineWidth = 3;
+
+        // Draw connections between key body points
+        const connections = [
+            [11, 12], // shoulders
+            [11, 13], // left upper arm
+            [13, 15], // left lower arm
+            [12, 14], // right upper arm
+            [14, 16], // right lower arm
+            [11, 23], // left torso
+            [12, 24], // right torso
+            [23, 24]  // hips
+        ];
+
+        for (const [start, end] of connections) {
+            const startPoint = poseLandmarks[start];
+            const endPoint = poseLandmarks[end];
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(startPoint.x * this.canvas.width, startPoint.y * this.canvas.height);
+            this.ctx.lineTo(endPoint.x * this.canvas.width, endPoint.y * this.canvas.height);
+            this.ctx.stroke();
+        }
+
+        // Draw landmarks
         for (const landmark of poseLandmarks) {
             const x = landmark.x * this.canvas.width;
             const y = landmark.y * this.canvas.height;
             
             this.ctx.beginPath();
-            this.ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
             this.ctx.fill();
         }
-
-        // Draw shoulder line as reference
-        const leftShoulder = poseLandmarks[11];
-        const rightShoulder = poseLandmarks[12];
-        
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = '#00FF00';
-        this.ctx.lineWidth = 2;
-        this.ctx.moveTo(leftShoulder.x * this.canvas.width, leftShoulder.y * this.canvas.height);
-        this.ctx.lineTo(rightShoulder.x * this.canvas.width, rightShoulder.y * this.canvas.height);
-        this.ctx.stroke();
     }
 } 
