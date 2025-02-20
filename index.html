@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Head Tracking Visualization</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Restore original working versions -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.5.1675469404/holistic.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466862/drawing_utils.js"></script>
 </head>
 <body>
@@ -17,7 +19,8 @@
                 <button id="requestPermission">Enable Camera</button>
             </div>
         </div>
-        <video class="input-video" width="640" height="480" autoplay playsinline muted></video>
+        <!-- Add crossorigin for video -->
+        <video class="input-video" width="640" height="480" autoplay playsinline muted crossorigin="anonymous"></video>
         <canvas class="output-canvas" width="640" height="480"></canvas>
         <div class="calibration-overlay hidden" id="calibrationOverlay">
             <div class="calibration-content">

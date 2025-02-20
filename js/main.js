@@ -24,7 +24,15 @@ async function requestCameraPermission(video) {
             } 
         });
         video.srcObject = stream;
-        await video.play();
+        
+        // Wait for video to be ready
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
+        });
+        
         document.getElementById('permissionOverlay').classList.add('hidden');
         return true;
     } catch (error) {
@@ -45,28 +53,18 @@ async function initialize() {
             throw new Error('Video or canvas element not found');
         }
 
-        // Set up permission button
-        const permissionBtn = document.getElementById('requestPermission');
-        permissionBtn.addEventListener('click', async () => {
-            const permissionGranted = await requestCameraPermission(video);
-            if (permissionGranted) {
-                faceTracker = new FaceTracker();
-                await faceTracker.initialize(video, canvas);
+        faceTracker = new FaceTracker();
+        await faceTracker.initialize(video, canvas);
 
-                // Show calibration overlay after camera starts
-                document.getElementById('calibrationOverlay').classList.remove('hidden');
-                
-                // Set up calibration button
-                const calibrateBtn = document.getElementById('calibrateBtn');
-                calibrateBtn.addEventListener('click', () => {
-                    const faceWidth = parseFloat(document.getElementById('faceWidth').value);
-                    if (faceWidth >= 10 && faceWidth <= 20) {
-                        faceTracker.calibrate(faceWidth);
-                        showStatus('Calibration successful!');
-                    } else {
-                        showStatus('Please enter a valid face width (10-20cm)');
-                    }
-                });
+        // Set up calibration button
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        calibrateBtn.addEventListener('click', () => {
+            const faceWidth = parseFloat(document.getElementById('faceWidth').value);
+            if (faceWidth >= 10 && faceWidth <= 20) {
+                faceTracker.calibrate(faceWidth);
+                showStatus('Calibration successful!');
+            } else {
+                showStatus('Please enter a valid face width (10-20cm)');
             }
         });
 

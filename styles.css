@@ -25,6 +25,7 @@ body {
     width: 640px;
     height: 480px;
     visibility: hidden;
+    object-fit: cover;
 }
 
 .output-canvas {
