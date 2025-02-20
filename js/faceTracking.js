@@ -61,99 +61,28 @@ class FaceTracker {
         };
         this.angleSmoothingFactor = 0.92; // Increased for more stability
 
-        // Modern color scheme
+        // Clean color scheme
         this.colors = {
-            primary: '#00E676',    // Main green
-            secondary: '#FFD700',  // Gold for important indicators
+            primary: '#00E676',    // Green for main elements
             text: '#FFFFFF',       // White text
-            background: 'rgba(0, 0, 0, 0.7)',
-            face: {
-                mesh: 'rgba(255, 255, 255, 0.1)',
-                outline: 'rgba(255, 255, 255, 0.3)',
-                eyes: '#00E676',
-                iris: '#FFD700'
+            axis: {
+                x: '#FF4444',      // Red for left/right axis
+                y: '#44FF44',      // Green for up/down axis
+                z: '#4444FF'       // Blue for forward/back axis
             }
         };
 
-        // Add 3D visualization parameters
-        this.visualization3D = {
-            scale: 50,  // Smaller scale for cleaner visualization
-            lineWidth: 2,
-            colors: {
-                sagittal: 'rgba(255, 0, 0, 0.4)',    // Semi-transparent red
-                coronal: 'rgba(0, 255, 0, 0.4)',     // Semi-transparent green
-                transverse: 'rgba(0, 0, 255, 0.4)'   // Semi-transparent blue
+        // Head movement visualization
+        this.headVisualization = {
+            axisLength: 50,        // Length of axis lines
+            position: {
+                x: this.canvas ? this.canvas.width - 150 : 490,  // Right side position
+                y: 120             // Top position
             },
             labels: {
-                sagittal: 'Sagittal Plane (Left/Right)',
-                coronal: 'Coronal Plane (Front/Back)',
-                transverse: 'Transverse Plane (Up/Down)'
-            }
-        };
-
-        // Direction indicator settings
-        this.directionIndicator = {
-            radius: 80,
-            arrowSize: 25,
-            position: {
-                x: 320,
-                y: 100
-            },
-            colors: {
-                base: 'rgba(255, 255, 255, 0.2)',
-                arrow: '#00E676'  // Using primary color
-            }
-        };
-
-        // Add motion trail parameters
-        this.motionTrail = {
-            positions: [],
-            maxLength: 20,  // Number of positions to remember
-            opacity: 0.6,   // Starting opacity
-            fadeRate: 0.03  // How quickly trail fades
-        };
-
-        // Add stability indicator parameters
-        this.stabilityIndicator = {
-            radius: 40,
-            maxRadius: 60,
-            minRadius: 30,
-            currentRadius: 40,
-            smoothing: 0.1
-        };
-
-        // Add display transition parameters
-        this.displayTransition = {
-            values: {
-                pitch: 0,
-                yaw: 0,
-                roll: 0
-            },
-            smoothing: 0.15
-        };
-
-        // Remove stability indicator and other unnecessary elements
-        // Add better labeling
-        this.labels = {
-            distance: "Distance from camera",
-            headPose: {
-                yaw: "Left/Right turn",
-                pitch: "Up/Down tilt",
-                roll: "Head tilt"
-            }
-        };
-
-        // Add 3D head direction visualization parameters
-        this.headDirection = {
-            size: 60,           // Size of 3D visualization
-            position: {
-                x: 320,         // Center horizontally
-                y: 100          // Near top of screen
-            },
-            colors: {
-                forward: '#00E676',  // Green for forward direction
-                up: '#FFD700',       // Gold for up direction
-                side: '#FF4444'      // Red for side direction
+                x: 'Left/Right',
+                y: 'Up/Down',
+                z: 'Forward/Back'
             }
         };
     }
@@ -211,19 +140,10 @@ class FaceTracker {
             if (results.poseLandmarks) {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
                 
-                // Draw visualization elements in correct order
+                // Draw only essential elements
                 this.drawBodyPose(results.poseLandmarks);
-                this.draw3DHeadDirection();  // Replace old direction indicator
+                this.drawHeadAxes();  // New axis visualization
                 this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
-                
-                // Calculate overall movement magnitude for stability indicator
-                const magnitude = Math.sqrt(
-                    this.headPose.pitch * this.headPose.pitch +
-                    this.headPose.yaw * this.headPose.yaw +
-                    this.headPose.roll * this.headPose.roll
-                ) / 180;
-                this.drawStabilityIndicator(magnitude);
-                
                 this.displayHeadPose();
             }
         }
@@ -731,5 +651,90 @@ class FaceTracker {
         this.ctx.fillText('← Left', -size - 40, 5);
         this.ctx.fillText('Right →', size + 10, 5);
         this.ctx.fillText('↓ Down', -20, size + 20);
+    }
+
+    // New method to draw head rotation axes
+    drawHeadAxes() {
+        const { axisLength, position, labels } = this.headVisualization;
+        const { pitch, yaw, roll } = this.headPose;
+
+        this.ctx.save();
+        this.ctx.translate(position.x, position.y);
+
+        // Draw axis lines with labels
+        // X-axis (left/right)
+        this.drawAxis(
+            axisLength, 
+            yaw,           // Use yaw angle for x-axis
+            this.colors.axis.x, 
+            labels.x
+        );
+
+        // Y-axis (up/down)
+        this.drawAxis(
+            axisLength, 
+            pitch,         // Use pitch angle for y-axis
+            this.colors.axis.y, 
+            labels.y,
+            Math.PI/2     // Rotate 90 degrees for vertical
+        );
+
+        // Z-axis (forward/back) - shown as a circle that changes size
+        this.drawZAxis(axisLength, roll, labels.z);
+
+        this.ctx.restore();
+    }
+
+    drawAxis(length, angle, color, label, baseRotation = 0) {
+        this.ctx.save();
+        this.ctx.rotate(baseRotation);
+
+        // Draw base line
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 2;
+        this.ctx.moveTo(-length/2, 0);
+        this.ctx.lineTo(length/2, 0);
+        this.ctx.stroke();
+
+        // Draw angle indicator
+        this.ctx.beginPath();
+        this.ctx.rotate(angle * Math.PI/180);
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(length/2, 0);
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 3;
+        this.ctx.stroke();
+
+        // Add label
+        this.ctx.fillStyle = color;
+        this.ctx.font = '14px Arial';
+        this.ctx.fillText(`${label}: ${angle.toFixed(1)}°`, length/2 + 10, 0);
+
+        this.ctx.restore();
+    }
+
+    drawZAxis(length, angle, label) {
+        // Draw circular indicator for Z-axis
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.colors.axis.z;
+        this.ctx.lineWidth = 2;
+        this.ctx.arc(0, 0, length/4, 0, 2 * Math.PI);
+        this.ctx.stroke();
+
+        // Add rotation indicator
+        this.ctx.save();
+        this.ctx.rotate(angle * Math.PI/180);
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -length/4);
+        this.ctx.lineTo(0, length/4);
+        this.ctx.strokeStyle = this.colors.axis.z;
+        this.ctx.lineWidth = 3;
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        // Add label
+        this.ctx.fillStyle = this.colors.axis.z;
+        this.ctx.fillText(`${label}: ${angle.toFixed(1)}°`, -length/2, length/2 + 20);
     }
 } 
