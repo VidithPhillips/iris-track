@@ -32,6 +32,22 @@ class FaceTracker {
             yaw: 0,   // Y-axis rotation (turning)
             roll: 0   // Z-axis rotation (tilting)
         };
+
+        // Add these properties in the constructor after the headPose object
+        // Add angle smoothing
+        this.previousHeadPose = {
+            pitch: 0,
+            yaw: 0,
+            roll: 0
+        };
+        this.angleSmoothingFactor = 0.85; // Higher = smoother but more latency
+
+        // Reference axes colors
+        this.axesColors = {
+            x: '#FF0000', // Sagittal plane (red)
+            y: '#00FF00', // Coronal plane (green)
+            z: '#0000FF'  // Transverse plane (blue)
+        };
     }
 
     async initialize(videoElement, canvasElement) {
@@ -288,5 +304,97 @@ class FaceTracker {
             this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
             this.ctx.fill();
         }
+    }
+
+    smoothAngle(current, previous) {
+        return previous * this.angleSmoothingFactor + current * (1 - this.angleSmoothingFactor);
+    }
+
+    drawReferenceAxes() {
+        const centerX = 580;
+        const centerY = 60;
+        const axisLength = 30;
+
+        // Draw anatomical reference diagram
+        this.ctx.save();
+        this.ctx.translate(centerX, centerY);
+
+        // Draw axes labels
+        this.ctx.font = '12px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        
+        // Sagittal plane (X-axis)
+        this.ctx.strokeStyle = this.axesColors.x;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-axisLength, 0);
+        this.ctx.lineTo(axisLength, 0);
+        this.ctx.stroke();
+        this.ctx.fillText('Sagittal', axisLength + 5, 4);
+
+        // Coronal plane (Y-axis)
+        this.ctx.strokeStyle = this.axesColors.y;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -axisLength);
+        this.ctx.lineTo(0, axisLength);
+        this.ctx.stroke();
+        this.ctx.fillText('Coronal', 5, -axisLength - 5);
+
+        // Transverse plane (circle for Z-axis)
+        this.ctx.strokeStyle = this.axesColors.z;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, axisLength/2, 0, 2 * Math.PI);
+        this.ctx.stroke();
+        this.ctx.fillText('Transverse', -axisLength - 60, 4);
+
+        this.ctx.restore();
+    }
+
+    drawNeckLine(poseLandmarks, faceLandmarks) {
+        const nose = faceLandmarks[1];
+        const midShoulders = {
+            x: (poseLandmarks[11].x + poseLandmarks[12].x) / 2,
+            y: (poseLandmarks[11].y + poseLandmarks[12].y) / 2
+        };
+
+        // Draw neck line
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = '#FFFF00';
+        this.ctx.lineWidth = 3;
+        this.ctx.moveTo(
+            midShoulders.x * this.canvas.width,
+            midShoulders.y * this.canvas.height
+        );
+        this.ctx.lineTo(
+            nose.x * this.canvas.width,
+            nose.y * this.canvas.height
+        );
+        this.ctx.stroke();
+
+        // Add direction indicator
+        this.drawHeadDirectionIndicator(nose, this.headPose.yaw);
+    }
+
+    drawHeadDirectionIndicator(nose, yawAngle) {
+        const arrowLength = 20;
+        
+        this.ctx.save();
+        this.ctx.translate(
+            nose.x * this.canvas.width,
+            nose.y * this.canvas.height
+        );
+        this.ctx.rotate(yawAngle * Math.PI / 180);
+
+        // Draw direction arrow
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = '#FFFF00';
+        this.ctx.lineWidth = 2;
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(arrowLength, 0);
+        this.ctx.lineTo(arrowLength - 5, -5);
+        this.ctx.moveTo(arrowLength, 0);
+        this.ctx.lineTo(arrowLength - 5, 5);
+        this.ctx.stroke();
+
+        this.ctx.restore();
     }
 } 
