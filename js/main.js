@@ -9,6 +9,10 @@ async function initialize() {
             throw new Error('Video or canvas element not found');
         }
 
+        // Request camera permission first
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+
         faceTracker = new FaceTracker();
         await faceTracker.initialize(video, canvas);
     } catch (error) {
@@ -17,4 +21,5 @@ async function initialize() {
     }
 }
 
-initialize(); 
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', initialize); 

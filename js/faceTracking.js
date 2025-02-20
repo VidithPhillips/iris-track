@@ -21,13 +21,14 @@ class FaceTracker {
     constructor() {
         this.holistic = new Holistic({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.5.1675469404/${file}`;
             }
         });
 
         this.holistic.setOptions({
-            modelComplexity: 1,
+            modelComplexity: 0,  // Set to 0 for better performance
             smoothLandmarks: true,
+            enableSegmentation: false,
             refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5,
@@ -218,5 +219,16 @@ class FaceTracker {
         this.ctx.fillText(`Tilt: ${roll.toFixed(1)}°`, -70, -10);
 
         this.ctx.restore();
+    }
+
+    displayHeadPose() {
+        const yOffset = 30;
+        this.ctx.font = '16px Arial';
+        this.ctx.fillStyle = this.colors.text;
+        
+        // Display angles in top-left corner
+        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset);
+        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 25);
+        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 50);
     }
 } 

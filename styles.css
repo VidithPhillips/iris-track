@@ -3,7 +3,28 @@ body {
     padding: 0;
     font-family: Arial, sans-serif;
     background-color: #1a1a1a;
-    color: #ffffff;
+}
+
+.container {
+    position: relative;
+    width: 640px;
+    height: 480px;
+    margin: 20px auto;
+}
+
+.input-video {
+    position: absolute;
+    width: 640px;
+    height: 480px;
+    visibility: hidden;
+}
+
+.output-canvas {
+    position: absolute;
+    width: 640px;
+    height: 480px;
+    left: 0;
+    top: 0;
 }
 
 .header {
@@ -11,27 +32,6 @@ body {
     padding: 20px;
     background-color: #2c2c2c;
     margin-bottom: 20px;
-}
-
-.container {
-    position: relative;
-    width: 640px;
-    height: 480px;
-    margin: 0 auto;
-    background-color: #2c2c2c;
-    padding: 20px;
-    border-radius: 10px;
-}
-
-.input-video {
-    display: none;
-}
-
-.output-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    border-radius: 5px;
 }
 
 .controls {
