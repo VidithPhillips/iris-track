@@ -35,18 +35,17 @@ class FaceTracker {
     constructor() {
         this.holistic = new Holistic({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.5.1675469404/${file}`;
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic@0.4.1633559476/${file}`;
             }
         });
 
         this.holistic.setOptions({
-            modelComplexity: 0,  // Lower complexity for better performance
+            modelComplexity: 1,
             smoothLandmarks: true,
             enableSegmentation: false,
             refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            selfieMode: true
+            minTrackingConfidence: 0.5
         });
 
         // Core parameters
@@ -91,22 +90,31 @@ class FaceTracker {
     }
 
     async initialize(videoElement, canvasElement) {
-        this.video = videoElement;
-        this.canvas = canvasElement;
-        this.ctx = canvasElement.getContext('2d');
+        try {
+            this.video = videoElement;
+            this.canvas = canvasElement;
+            this.ctx = canvasElement.getContext('2d');
 
-        this.holistic.onResults(this.onResults.bind(this));
+            // Set up holistic first
+            this.holistic.onResults(this.onResults.bind(this));
 
-        // Restore Camera Utils
-        this.camera = new Camera(this.video, {
-            onFrame: async () => {
-                await this.holistic.send({image: this.video});
-            },
-            width: 640,
-            height: 480
-        });
+            // Initialize camera with error handling
+            this.camera = new Camera(this.video, {
+                onFrame: async () => {
+                    await this.holistic.send({image: this.video});
+                },
+                width: 640,
+                height: 480
+            });
 
-        await this.camera.start();
+            console.log('Starting camera...');
+            await this.camera.start();
+            console.log('Camera started successfully');
+
+        } catch (error) {
+            console.error('Error in FaceTracker initialization:', error);
+            throw new Error('Failed to initialize face tracking: ' + error.message);
+        }
     }
 
     showError(message) {
