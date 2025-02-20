@@ -401,28 +401,56 @@ class FaceTracker {
 
     // Add new method to display iris tracking
     displayIrisTracking() {
+        // Position below distance measurement with more space
         const startX = 20;
-        const startY = 200;  // Position below other measurements
-        const lineSpacing = 25;
+        const startY = 180;  // Adjusted position
+        const lineSpacing = 30;  // Increased spacing
+        const boxPadding = 15;
 
-        this.ctx.font = '14px Arial';
-        this.ctx.fillStyle = this.colors.text;
-
-        // Display baseline-relative calculations
+        // Calculate angles and deltas
         const leftDeltaAngle = (this.irisTracking.left.angle - this.irisTracking.baseline.left.angle).toFixed(1);
         const rightDeltaAngle = (this.irisTracking.right.angle - this.irisTracking.baseline.right.angle).toFixed(1);
+        const averageMovement = ((parseFloat(leftDeltaAngle) + parseFloat(rightDeltaAngle)) / 2).toFixed(1);
 
-        // Draw background for formulas
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(startX - 5, startY - 20, 300, 100);
-        this.ctx.fillStyle = this.colors.text;
+        // Draw a more visible background box
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';  // Darker background
+        this.ctx.fillRect(
+            startX - boxPadding, 
+            startY - boxPadding, 
+            400,  // Wider box
+            lineSpacing * 4  // Taller box
+        );
 
-        // Display real-time calculations
-        this.ctx.fillText(`Left Iris Δ° = ${leftDeltaAngle}° (${this.irisTracking.left.angle.toFixed(1)}° - ${this.irisTracking.baseline.left.angle.toFixed(1)}°)`, 
-            startX, startY);
-        this.ctx.fillText(`Right Iris Δ° = ${rightDeltaAngle}° (${this.irisTracking.right.angle.toFixed(1)}° - ${this.irisTracking.baseline.right.angle.toFixed(1)}°)`, 
-            startX, startY + lineSpacing);
-        this.ctx.fillText(`Average Eye Movement: ${((parseFloat(leftDeltaAngle) + parseFloat(rightDeltaAngle)) / 2).toFixed(1)}°`, 
-            startX, startY + lineSpacing * 2);
+        // Set up text style
+        this.ctx.font = 'bold 16px Arial';  // Made text bigger and bold
+        this.ctx.fillStyle = '#00E676';  // Using the green color for better visibility
+        
+        // Title
+        this.ctx.fillText('Eye Movement Calculations:', startX, startY);
+        
+        // Switch to white for measurements
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '14px Arial';
+
+        // Display calculations with formula
+        this.ctx.fillText(
+            `Left Eye Δ° = ${leftDeltaAngle}° (${this.irisTracking.left.angle.toFixed(1)}° - ${this.irisTracking.baseline.left.angle.toFixed(1)}°)`, 
+            startX, 
+            startY + lineSpacing
+        );
+
+        this.ctx.fillText(
+            `Right Eye Δ° = ${rightDeltaAngle}° (${this.irisTracking.right.angle.toFixed(1)}° - ${this.irisTracking.baseline.right.angle.toFixed(1)}°)`, 
+            startX, 
+            startY + lineSpacing * 2
+        );
+
+        // Highlight average movement
+        this.ctx.fillStyle = '#00E676';  // Green for emphasis
+        this.ctx.fillText(
+            `Average Eye Movement: ${averageMovement}°`, 
+            startX, 
+            startY + lineSpacing * 3
+        );
     }
 } 
