@@ -61,11 +61,20 @@ class FaceTracker {
         };
         this.angleSmoothingFactor = 0.92; // Increased for more stability
 
-        // Reference axes colors
-        this.axesColors = {
-            x: '#FF0000', // Sagittal plane (red)
-            y: '#00FF00', // Coronal plane (green)
-            z: '#0000FF'  // Transverse plane (blue)
+        // Modern color scheme
+        this.colors = {
+            primary: '#00E676',    // Bright green for main elements
+            secondary: '#FFFFFF',   // White for supporting elements
+            accent: '#FFD700',     // Gold for highlights
+            text: '#FFFFFF',       // White text
+            background: 'rgba(0, 0, 0, 0.7)', // Semi-transparent black
+            face: {
+                mesh: 'rgba(255, 255, 255, 0.1)',  // Subtle white for face mesh
+                outline: 'rgba(255, 255, 255, 0.4)', // More visible white for outline
+                leftEye: '#00E676',  // Green for left eye
+                rightEye: '#00E676', // Green for right eye
+                iris: '#FFD700'      // Gold for iris
+            }
         };
 
         // Add 3D visualization parameters
@@ -82,6 +91,47 @@ class FaceTracker {
                 coronal: 'Coronal Plane (Front/Back)',
                 transverse: 'Transverse Plane (Up/Down)'
             }
+        };
+
+        // Direction indicator settings
+        this.directionIndicator = {
+            radius: 80,
+            arrowSize: 25,
+            position: {
+                x: 320,
+                y: 100
+            },
+            colors: {
+                base: 'rgba(255, 255, 255, 0.2)',
+                arrow: '#00E676'  // Using primary color
+            }
+        };
+
+        // Add motion trail parameters
+        this.motionTrail = {
+            positions: [],
+            maxLength: 20,  // Number of positions to remember
+            opacity: 0.6,   // Starting opacity
+            fadeRate: 0.03  // How quickly trail fades
+        };
+
+        // Add stability indicator parameters
+        this.stabilityIndicator = {
+            radius: 40,
+            maxRadius: 60,
+            minRadius: 30,
+            currentRadius: 40,
+            smoothing: 0.1
+        };
+
+        // Add display transition parameters
+        this.displayTransition = {
+            values: {
+                pitch: 0,
+                yaw: 0,
+                roll: 0
+            },
+            smoothing: 0.15
         };
     }
 
@@ -139,10 +189,19 @@ class FaceTracker {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
                 
                 // Draw visualization elements in correct order
+                this.drawMotionTrail(results.faceLandmarks);
                 this.drawBodyPose(results.poseLandmarks);
-                this.draw3DPlanes(results.faceLandmarks);
+                this.drawHeadDirection(results.faceLandmarks);
                 this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
-                this.drawReferenceAxes();
+                
+                // Calculate overall movement magnitude for stability indicator
+                const magnitude = Math.sqrt(
+                    this.headPose.pitch * this.headPose.pitch +
+                    this.headPose.yaw * this.headPose.yaw +
+                    this.headPose.roll * this.headPose.roll
+                ) / 180;
+                this.drawStabilityIndicator(magnitude);
+                
                 this.displayHeadPose();
             }
         }
@@ -165,9 +224,8 @@ class FaceTracker {
     }
 
     drawFaceOutline(landmarks) {
-        // Draw face contour
         this.ctx.beginPath();
-        this.ctx.strokeStyle = '#FFFFFF40';
+        this.ctx.strokeStyle = this.colors.face.outline;
         this.ctx.lineWidth = 2;
         
         // Face outline points
@@ -187,27 +245,22 @@ class FaceTracker {
 
     drawEnhancedEyes(landmarks) {
         // Draw right eye
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = '#FF3030';
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = this.colors.face.rightEye;
         drawConnectors(this.ctx, landmarks, FACEMESH_RIGHT_EYE, 
-            {color: '#FF3030', lineWidth: 2});
+            {color: this.colors.face.rightEye, lineWidth: 2});
         
         // Draw left eye
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = '#30FF30';
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = this.colors.face.leftEye;
         drawConnectors(this.ctx, landmarks, FACEMESH_LEFT_EYE,
-            {color: '#30FF30', lineWidth: 2});
+            {color: this.colors.face.leftEye, lineWidth: 2});
     }
 
     drawEnhancedIris(irisLandmarks, color) {
-        // Add glow effect
-        this.ctx.shadowColor = color;
+        this.ctx.shadowColor = this.colors.face.iris;
         this.ctx.shadowBlur = 15;
         
         this.ctx.beginPath();
-        this.ctx.strokeStyle = color;
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.lineWidth = 2;
 
         const firstPoint = irisLandmarks[0];
@@ -293,31 +346,36 @@ class FaceTracker {
     }
 
     displayHeadPose() {
+        // Update transition values
+        this.displayTransition.values.pitch += (this.headPose.pitch - this.displayTransition.values.pitch) * this.displayTransition.smoothing;
+        this.displayTransition.values.yaw += (this.headPose.yaw - this.displayTransition.values.yaw) * this.displayTransition.smoothing;
+        this.displayTransition.values.roll += (this.headPose.roll - this.displayTransition.values.roll) * this.displayTransition.smoothing;
+
         const yOffset = 50;
         this.ctx.font = '16px Arial';
         
-        // Create background for better visibility
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        // Background with gradient
+        const gradient = this.ctx.createLinearGradient(10, yOffset, 260, yOffset + 120);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+        this.ctx.fillStyle = gradient;
         this.ctx.fillRect(10, yOffset, 250, 120);
         
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillText('Head Rotation Angles:', 20, yOffset + 20);
-        
-        // Display angles with anatomical descriptions
-        this.ctx.fillStyle = this.axesColors.x;
-        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}° (Nod)`, 20, yOffset + 50);
-        
-        this.ctx.fillStyle = this.axesColors.y;
-        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}° (Turn)`, 20, yOffset + 80);
-        
-        this.ctx.fillStyle = this.axesColors.z;
-        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}° (Tilt)`, 20, yOffset + 110);
+        // Add subtle border
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        this.ctx.strokeRect(10, yOffset, 250, 120);
+
+        // Text with smooth transitions
+        this.ctx.fillStyle = this.colors.text;
+        this.ctx.fillText('Head Rotation:', 20, yOffset + 20);
+        this.ctx.fillText(`Pitch (Nod): ${this.displayTransition.values.pitch.toFixed(1)}°`, 20, yOffset + 50);
+        this.ctx.fillText(`Yaw (Turn): ${this.displayTransition.values.yaw.toFixed(1)}°`, 20, yOffset + 80);
+        this.ctx.fillText(`Roll (Tilt): ${this.displayTransition.values.roll.toFixed(1)}°`, 20, yOffset + 110);
     }
 
     drawBodyPose(poseLandmarks) {
-        // Make body landmarks more visible
-        this.ctx.fillStyle = '#00FF00';
-        this.ctx.strokeStyle = '#00FF00';
+        this.ctx.fillStyle = this.colors.primary;
+        this.ctx.strokeStyle = this.colors.primary;
         this.ctx.lineWidth = 3;
 
         // Draw connections between key body points
@@ -374,7 +432,7 @@ class FaceTracker {
         this.ctx.fillStyle = '#FFFFFF';
         
         // Sagittal plane (X-axis)
-        this.ctx.strokeStyle = this.axesColors.x;
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.beginPath();
         this.ctx.moveTo(-axisLength, 0);
         this.ctx.lineTo(axisLength, 0);
@@ -382,7 +440,7 @@ class FaceTracker {
         this.ctx.fillText('Sagittal', axisLength + 5, 4);
 
         // Coronal plane (Y-axis)
-        this.ctx.strokeStyle = this.axesColors.y;
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.beginPath();
         this.ctx.moveTo(0, -axisLength);
         this.ctx.lineTo(0, axisLength);
@@ -390,7 +448,7 @@ class FaceTracker {
         this.ctx.fillText('Coronal', 5, -axisLength - 5);
 
         // Transverse plane (circle for Z-axis)
-        this.ctx.strokeStyle = this.axesColors.z;
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.beginPath();
         this.ctx.arc(0, 0, axisLength/2, 0, 2 * Math.PI);
         this.ctx.stroke();
@@ -408,7 +466,7 @@ class FaceTracker {
 
         // Draw neck line
         this.ctx.beginPath();
-        this.ctx.strokeStyle = '#FFFF00';
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.lineWidth = 3;
         this.ctx.moveTo(
             midShoulders.x * this.canvas.width,
@@ -436,7 +494,7 @@ class FaceTracker {
 
         // Draw direction arrow
         this.ctx.beginPath();
-        this.ctx.strokeStyle = '#FFFF00';
+        this.ctx.strokeStyle = this.colors.face.iris;
         this.ctx.lineWidth = 2;
         this.ctx.moveTo(0, 0);
         this.ctx.lineTo(arrowLength, 0);
@@ -448,91 +506,131 @@ class FaceTracker {
         this.ctx.restore();
     }
 
-    // Add new method for 3D plane visualization
-    draw3DPlanes(faceLandmarks) {
-        const nose = faceLandmarks[1];
-        const noseX = nose.x * this.canvas.width;
-        const noseY = nose.y * this.canvas.height;
+    // Replace the complex draw3DPlanes with this simpler visualization
+    drawHeadDirection(faceLandmarks) {
+        const { radius, arrowSize, position, colors } = this.directionIndicator;
         
-        // Draw anatomical planes with labels
         this.ctx.save();
-        this.ctx.translate(noseX, noseY);
-        
-        // Draw anatomical reference planes
-        const planeSize = this.visualization3D.scale;
-        
-        // Sagittal plane (divides body into left and right)
-        this.ctx.fillStyle = this.visualization3D.colors.sagittal;
-        this.ctx.strokeStyle = '#FF0000';
-        this.drawAnatomicalPlane('vertical', planeSize, this.headPose.yaw);
-        this.ctx.fillText(this.visualization3D.labels.sagittal, planeSize + 10, 0);
+        this.ctx.translate(position.x, position.y);
 
-        // Coronal plane (divides body into front and back)
-        this.ctx.fillStyle = this.visualization3D.colors.coronal;
-        this.ctx.strokeStyle = '#00FF00';
-        this.drawAnatomicalPlane('horizontal', planeSize, this.headPose.roll);
-        this.ctx.fillText(this.visualization3D.labels.coronal, 0, -planeSize - 10);
-
-        // Transverse plane (divides body into top and bottom)
-        this.ctx.fillStyle = this.visualization3D.colors.transverse;
-        this.ctx.strokeStyle = '#0000FF';
-        this.drawAnatomicalPlane('horizontal', planeSize, this.headPose.pitch);
-        this.ctx.fillText(this.visualization3D.labels.transverse, 0, planeSize + 20);
-
-        this.ctx.restore();
-    }
-
-    // New method for drawing anatomical planes
-    drawAnatomicalPlane(orientation, size, angle) {
-        this.ctx.save();
-        this.ctx.rotate(angle * Math.PI / 180);
-        
-        // Draw the plane with fill and border
+        // Draw circular base
         this.ctx.beginPath();
-        if (orientation === 'vertical') {
-            this.ctx.rect(-size/4, -size, size/2, size * 2);
-        } else {
-            this.ctx.rect(-size, -size/4, size * 2, size/2);
-        }
-        this.ctx.fill();
-        this.ctx.stroke();
-
-        // Add direction indicators
-        this.drawDirectionIndicators(orientation, size);
-        
-        this.ctx.restore();
-    }
-
-    // New method for drawing direction indicators
-    drawDirectionIndicators(orientation, size) {
-        const arrowSize = size / 4;
+        this.ctx.strokeStyle = colors.base;
         this.ctx.lineWidth = 2;
-        
-        if (orientation === 'vertical') {
-            // Draw left/right arrows
-            this.drawArrow(0, -size/2, arrowSize, 0);
-            this.drawArrow(0, size/2, arrowSize, Math.PI);
-        } else {
-            // Draw front/back or up/down arrows
-            this.drawArrow(-size/2, 0, arrowSize, -Math.PI/2);
-            this.drawArrow(size/2, 0, arrowSize, Math.PI/2);
+        this.ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+        this.ctx.stroke();
+
+        // Calculate combined direction from angles
+        const pitch = this.headPose.pitch * Math.PI / 180;
+        const yaw = this.headPose.yaw * Math.PI / 180;
+        const roll = this.headPose.roll * Math.PI / 180;
+
+        // Calculate direction vector
+        const directionX = Math.sin(yaw) * Math.cos(pitch);
+        const directionY = Math.sin(pitch);
+        const magnitude = Math.sqrt(directionX * directionX + directionY * directionY);
+
+        // Only draw arrow if there's significant movement
+        if (magnitude > 0.1) {
+            const angle = Math.atan2(directionY, directionX);
+            
+            // Draw direction arrow
+            this.ctx.shadowColor = this.colors.primary;
+            this.ctx.shadowBlur = 10;
+            this.ctx.strokeStyle = this.colors.primary;
+            this.ctx.lineWidth = 3;
+            
+            // Draw arrow shaft
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            const endX = Math.cos(angle) * radius;
+            const endY = Math.sin(angle) * radius;
+            this.ctx.lineTo(endX, endY);
+            
+            // Draw arrow head
+            const arrowAngle = Math.PI / 6; // 30 degrees
+            this.ctx.lineTo(
+                endX - arrowSize * Math.cos(angle - arrowAngle),
+                endY - arrowSize * Math.sin(angle - arrowAngle)
+            );
+            this.ctx.moveTo(endX, endY);
+            this.ctx.lineTo(
+                endX - arrowSize * Math.cos(angle + arrowAngle),
+                endY - arrowSize * Math.sin(angle + arrowAngle)
+            );
+            this.ctx.stroke();
+
+            // Reset shadow
+            this.ctx.shadowBlur = 0;
+            
+            // Add magnitude indicator
+            const magnitudeText = `${(magnitude * 100).toFixed(0)}%`;
+            this.ctx.font = '14px Arial';
+            this.ctx.fillStyle = this.colors.primary;
+            this.ctx.fillText(magnitudeText, endX + 10, endY);
         }
+
+        this.ctx.restore();
     }
 
-    // Helper method for drawing arrows
-    drawArrow(x, y, size, angle) {
-        this.ctx.save();
-        this.ctx.translate(x, y);
-        this.ctx.rotate(angle);
+    drawMotionTrail(faceLandmarks) {
+        const nose = faceLandmarks[1];
+        const currentPos = {
+            x: nose.x * this.canvas.width,
+            y: nose.y * this.canvas.height,
+            timestamp: Date.now()
+        };
+
+        // Add current position to trail
+        this.motionTrail.positions.push(currentPos);
         
+        // Remove old positions
+        if (this.motionTrail.positions.length > this.motionTrail.maxLength) {
+            this.motionTrail.positions.shift();
+        }
+
+        // Draw trail
         this.ctx.beginPath();
-        this.ctx.moveTo(0, 0);
-        this.ctx.lineTo(0, size);
-        this.ctx.moveTo(-size/3, size/3);
-        this.ctx.lineTo(0, size);
-        this.ctx.lineTo(size/3, size/3);
+        this.ctx.strokeStyle = this.colors.primary;
+        this.ctx.lineWidth = 2;
+
+        this.motionTrail.positions.forEach((pos, i) => {
+            const opacity = (i / this.motionTrail.maxLength) * this.motionTrail.opacity;
+            this.ctx.strokeStyle = `rgba(0, 230, 118, ${opacity})`;
+            
+            if (i === 0) {
+                this.ctx.moveTo(pos.x, pos.y);
+            } else {
+                this.ctx.lineTo(pos.x, pos.y);
+            }
+        });
         this.ctx.stroke();
+    }
+
+    drawStabilityIndicator(magnitude) {
+        const targetRadius = this.stabilityIndicator.maxRadius - 
+            (magnitude * (this.stabilityIndicator.maxRadius - this.stabilityIndicator.minRadius));
         
-        this.ctx.restore();
+        this.stabilityIndicator.currentRadius += 
+            (targetRadius - this.stabilityIndicator.currentRadius) * this.stabilityIndicator.smoothing;
+
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.colors.accent;
+        this.ctx.lineWidth = 2;
+        this.ctx.arc(
+            this.canvas.width - 50,
+            50,
+            this.stabilityIndicator.currentRadius,
+            0,
+            2 * Math.PI
+        );
+        this.ctx.stroke();
+
+        // Add glow effect based on stability
+        const glowSize = Math.max(0, 20 - magnitude * 15);
+        this.ctx.shadowColor = this.colors.accent;
+        this.ctx.shadowBlur = glowSize;
+        this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
     }
 } 
