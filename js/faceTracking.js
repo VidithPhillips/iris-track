@@ -70,12 +70,17 @@ class FaceTracker {
 
         // Add 3D visualization parameters
         this.visualization3D = {
-            scale: 100,
+            scale: 50,  // Smaller scale for cleaner visualization
             lineWidth: 2,
             colors: {
-                sagittal: '#FF4444',
-                coronal: '#44FF44',
-                transverse: '#4444FF'
+                sagittal: 'rgba(255, 0, 0, 0.4)',    // Semi-transparent red
+                coronal: 'rgba(0, 255, 0, 0.4)',     // Semi-transparent green
+                transverse: 'rgba(0, 0, 255, 0.4)'   // Semi-transparent blue
+            },
+            labels: {
+                sagittal: 'Sagittal Plane (Left/Right)',
+                coronal: 'Coronal Plane (Front/Back)',
+                transverse: 'Transverse Plane (Up/Down)'
             }
         };
     }
@@ -293,20 +298,20 @@ class FaceTracker {
         
         // Create background for better visibility
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, yOffset, 200, 100);
+        this.ctx.fillRect(10, yOffset, 250, 120);
         
         this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillText('Head Pose Angles:', 20, yOffset + 20);
+        this.ctx.fillText('Head Rotation Angles:', 20, yOffset + 20);
         
-        // Display angles with color-coded axes
+        // Display angles with anatomical descriptions
         this.ctx.fillStyle = this.axesColors.x;
-        this.ctx.fillText(`Pitch (nod): ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 40);
+        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}° (Nod)`, 20, yOffset + 50);
         
         this.ctx.fillStyle = this.axesColors.y;
-        this.ctx.fillText(`Yaw (turn): ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 60);
+        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}° (Turn)`, 20, yOffset + 80);
         
         this.ctx.fillStyle = this.axesColors.z;
-        this.ctx.fillText(`Roll (tilt): ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 80);
+        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}° (Tilt)`, 20, yOffset + 110);
     }
 
     drawBodyPose(poseLandmarks) {
@@ -449,76 +454,85 @@ class FaceTracker {
         const noseX = nose.x * this.canvas.width;
         const noseY = nose.y * this.canvas.height;
         
+        // Draw anatomical planes with labels
         this.ctx.save();
         this.ctx.translate(noseX, noseY);
         
-        // Apply head rotation
-        const rotationMatrix = this.create3DRotationMatrix(
-            this.headPose.pitch,
-            this.headPose.yaw,
-            this.headPose.roll
-        );
+        // Draw anatomical reference planes
+        const planeSize = this.visualization3D.scale;
         
-        // Draw sagittal plane (red)
-        this.ctx.strokeStyle = this.visualization3D.colors.sagittal;
-        this.ctx.lineWidth = this.visualization3D.lineWidth;
-        this.drawPlane(rotationMatrix, [1, 0, 0]);
+        // Sagittal plane (divides body into left and right)
+        this.ctx.fillStyle = this.visualization3D.colors.sagittal;
+        this.ctx.strokeStyle = '#FF0000';
+        this.drawAnatomicalPlane('vertical', planeSize, this.headPose.yaw);
+        this.ctx.fillText(this.visualization3D.labels.sagittal, planeSize + 10, 0);
+
+        // Coronal plane (divides body into front and back)
+        this.ctx.fillStyle = this.visualization3D.colors.coronal;
+        this.ctx.strokeStyle = '#00FF00';
+        this.drawAnatomicalPlane('horizontal', planeSize, this.headPose.roll);
+        this.ctx.fillText(this.visualization3D.labels.coronal, 0, -planeSize - 10);
+
+        // Transverse plane (divides body into top and bottom)
+        this.ctx.fillStyle = this.visualization3D.colors.transverse;
+        this.ctx.strokeStyle = '#0000FF';
+        this.drawAnatomicalPlane('horizontal', planeSize, this.headPose.pitch);
+        this.ctx.fillText(this.visualization3D.labels.transverse, 0, planeSize + 20);
+
+        this.ctx.restore();
+    }
+
+    // New method for drawing anatomical planes
+    drawAnatomicalPlane(orientation, size, angle) {
+        this.ctx.save();
+        this.ctx.rotate(angle * Math.PI / 180);
         
-        // Draw coronal plane (green)
-        this.ctx.strokeStyle = this.visualization3D.colors.coronal;
-        this.drawPlane(rotationMatrix, [0, 1, 0]);
-        
-        // Draw transverse plane (blue)
-        this.ctx.strokeStyle = this.visualization3D.colors.transverse;
-        this.drawPlane(rotationMatrix, [0, 0, 1]);
+        // Draw the plane with fill and border
+        this.ctx.beginPath();
+        if (orientation === 'vertical') {
+            this.ctx.rect(-size/4, -size, size/2, size * 2);
+        } else {
+            this.ctx.rect(-size, -size/4, size * 2, size/2);
+        }
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        // Add direction indicators
+        this.drawDirectionIndicators(orientation, size);
         
         this.ctx.restore();
     }
 
-    create3DRotationMatrix(pitch, yaw, roll) {
-        const cp = Math.cos(pitch * Math.PI / 180);
-        const sp = Math.sin(pitch * Math.PI / 180);
-        const cy = Math.cos(yaw * Math.PI / 180);
-        const sy = Math.sin(yaw * Math.PI / 180);
-        const cr = Math.cos(roll * Math.PI / 180);
-        const sr = Math.sin(roll * Math.PI / 180);
+    // New method for drawing direction indicators
+    drawDirectionIndicators(orientation, size) {
+        const arrowSize = size / 4;
+        this.ctx.lineWidth = 2;
         
-        return [
-            [cy * cr, -cy * sr, sy],
-            [cp * sr + sp * sy * cr, cp * cr - sp * sy * sr, -sp * cy],
-            [sp * sr - cp * sy * cr, sp * cr + cp * sy * sr, cp * cy]
-        ];
+        if (orientation === 'vertical') {
+            // Draw left/right arrows
+            this.drawArrow(0, -size/2, arrowSize, 0);
+            this.drawArrow(0, size/2, arrowSize, Math.PI);
+        } else {
+            // Draw front/back or up/down arrows
+            this.drawArrow(-size/2, 0, arrowSize, -Math.PI/2);
+            this.drawArrow(size/2, 0, arrowSize, Math.PI/2);
+        }
     }
 
-    drawPlane(matrix, normal) {
-        const scale = this.visualization3D.scale;
-        const points = [
-            [-scale, -scale, 0],
-            [scale, -scale, 0],
-            [scale, scale, 0],
-            [-scale, scale, 0]
-        ];
+    // Helper method for drawing arrows
+    drawArrow(x, y, size, angle) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+        this.ctx.rotate(angle);
         
         this.ctx.beginPath();
-        points.forEach((point, i) => {
-            const projected = this.projectPoint(matrix, point);
-            if (i === 0) {
-                this.ctx.moveTo(projected[0], projected[1]);
-            } else {
-                this.ctx.lineTo(projected[0], projected[1]);
-            }
-        });
-        this.ctx.closePath();
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(0, size);
+        this.ctx.moveTo(-size/3, size/3);
+        this.ctx.lineTo(0, size);
+        this.ctx.lineTo(size/3, size/3);
         this.ctx.stroke();
-    }
-
-    projectPoint(matrix, point) {
-        const result = [0, 0, 0];
-        for (let i = 0; i < 3; i++) {
-            result[i] = matrix[i][0] * point[0] + 
-                       matrix[i][1] * point[1] + 
-                       matrix[i][2] * point[2];
-        }
-        return [result[0], result[1]];
+        
+        this.ctx.restore();
     }
 } 
