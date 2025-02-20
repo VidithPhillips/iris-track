@@ -101,9 +101,20 @@ class FaceTracker {
 
             // If we have both pose and face landmarks, calculate head pose
             if (results.poseLandmarks) {
+                // Calculate head pose angles
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
-                this.displayHeadPose();
+                
+                // Draw body pose first (background)
                 this.drawBodyPose(results.poseLandmarks);
+                
+                // Draw neck line and direction indicator
+                this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
+                
+                // Draw reference axes in top-right corner
+                this.drawReferenceAxes();
+                
+                // Display head pose angles with color coding
+                this.displayHeadPose();
             }
         }
     }
@@ -257,14 +268,21 @@ class FaceTracker {
         this.ctx.font = '16px Arial';
         
         // Create background for better visibility
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(10, yOffset, 200, 90);
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, yOffset, 200, 100);
         
         this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillText(`Head Pose Angles:`, 20, yOffset + 20);
-        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 40);
-        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 60);
-        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 80);
+        this.ctx.fillText('Head Pose Angles:', 20, yOffset + 20);
+        
+        // Display angles with color-coded axes
+        this.ctx.fillStyle = this.axesColors.x;
+        this.ctx.fillText(`Pitch (nod): ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 40);
+        
+        this.ctx.fillStyle = this.axesColors.y;
+        this.ctx.fillText(`Yaw (turn): ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 60);
+        
+        this.ctx.fillStyle = this.axesColors.z;
+        this.ctx.fillText(`Roll (tilt): ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 80);
     }
 
     drawBodyPose(poseLandmarks) {
