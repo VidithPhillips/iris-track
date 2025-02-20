@@ -226,58 +226,62 @@ class FaceTracker {
     }
 
     drawHeadAxes() {
-        const position = {x: this.canvas.width - 150, y: 120};
+        const position = {x: this.canvas.width - 130, y: 140};
         const axisLength = 60;
 
         this.ctx.save();
         this.ctx.translate(position.x, position.y);
 
-        // Draw background
+        // Draw background with larger size
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        this.ctx.fillRect(-80, -80, 160, 160);
+        this.ctx.fillRect(-90, -90, 180, 180);  // Increased size of background
 
-        // Draw axes with labels
+        // Draw axes with labels - increased spacing
         this.ctx.font = '14px Arial';
         const { yaw, pitch, roll } = this.headPose;
 
-        // Yaw (Left/Right)
+        // Yaw (Left/Right) - adjusted positions
         this.ctx.strokeStyle = this.colors.axis.x;
         this.ctx.fillStyle = this.colors.axis.x;
         this.ctx.beginPath();
         this.ctx.moveTo(-axisLength, 0);
         this.ctx.lineTo(axisLength, 0);
         this.ctx.stroke();
-        this.ctx.fillText(`Left/Right: ${yaw.toFixed(1)}°`, -70, -50);
+        this.ctx.fillText(`Left/Right: ${yaw.toFixed(1)}°`, -80, -60);
 
-        // Pitch (Up/Down)
+        // Pitch (Up/Down) - adjusted positions
         this.ctx.strokeStyle = this.colors.axis.y;
         this.ctx.fillStyle = this.colors.axis.y;
         this.ctx.beginPath();
         this.ctx.moveTo(0, -axisLength);
         this.ctx.lineTo(0, axisLength);
         this.ctx.stroke();
-        this.ctx.fillText(`Up/Down: ${pitch.toFixed(1)}°`, -70, -30);
+        this.ctx.fillText(`Up/Down: ${pitch.toFixed(1)}°`, -80, -35);
 
-        // Roll (Tilt)
+        // Roll (Tilt) - adjusted positions
         this.ctx.strokeStyle = this.colors.axis.z;
         this.ctx.fillStyle = this.colors.axis.z;
         this.ctx.beginPath();
         this.ctx.arc(0, 0, axisLength/2, 0, 2 * Math.PI);
         this.ctx.stroke();
-        this.ctx.fillText(`Tilt: ${roll.toFixed(1)}°`, -70, -10);
+        this.ctx.fillText(`Tilt: ${roll.toFixed(1)}°`, -80, -10);
 
         this.ctx.restore();
     }
 
     displayHeadPose() {
-        const yOffset = 30;
+        // Position text in top-left corner with more spacing
+        const startX = 20;
+        const startY = 40;  // Moved up slightly
+        const lineSpacing = 30;  // Increased spacing between lines
+        
         this.ctx.font = '16px Arial';
         this.ctx.fillStyle = this.colors.text;
         
-        // Display angles in top-left corner
-        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset);
-        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 25);
-        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 50);
+        // Display angles with better spacing
+        this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, startX, startY);
+        this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, startX, startY + lineSpacing);
+        this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, startX, startY + lineSpacing * 2);
     }
 
     calculateDistance(landmarks) {
@@ -297,9 +301,10 @@ class FaceTracker {
     }
 
     displayDistance(distance) {
+        // Position distance text below head pose info
         this.ctx.font = '16px Arial';
         this.ctx.fillStyle = this.colors.text;
-        this.ctx.fillText(`Distance: ${distance.toFixed(1)} cm`, 20, 90);
+        this.ctx.fillText(`Distance: ${distance.toFixed(1)} cm`, 20, 130);  // Moved down for better spacing
     }
 
     // Add calibration method

@@ -11,18 +11,39 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic"></script>
 </head>
 <body>
-    <div class="container">
-        <video class="input-video" width="640" height="480" autoplay playsinline muted></video>
-        <canvas class="output-canvas" width="640" height="480"></canvas>
-        <div class="calibration-overlay hidden" id="calibrationOverlay">
-            <div class="calibration-content">
-                <h3>Distance Calibration</h3>
-                <p>Enter your actual face width (temple to temple) in cm:</p>
-                <input type="number" id="faceWidth" value="15" min="10" max="20" step="0.5">
-                <button id="calibrateBtn">Calibrate</button>
-            </div>
+    <div class="page-wrapper">
+        <header class="site-header">
+            <h1>3D Head Tracking</h1>
+            <p class="subtitle">Real-time face tracking and distance measurement</p>
+        </header>
+
+        <div class="instructions">
+            <h2>How to Use</h2>
+            <ul>
+                <li>Allow camera access when prompted</li>
+                <li>Position your face in the frame</li>
+                <li>Calibrate the distance measurement for accuracy</li>
+                <li>Watch the real-time tracking in action!</li>
+            </ul>
         </div>
-        <div class="status-message hidden" id="statusMessage"></div>
+
+        <div class="container">
+            <video class="input-video" width="640" height="480" autoplay playsinline muted></video>
+            <canvas class="output-canvas" width="640" height="480"></canvas>
+            <div class="calibration-overlay hidden" id="calibrationOverlay">
+                <div class="calibration-content">
+                    <h3>Distance Calibration</h3>
+                    <p>Enter your actual face width (temple to temple) in cm:</p>
+                    <input type="number" id="faceWidth" value="15" min="10" max="20" step="0.5">
+                    <button id="calibrateBtn">Calibrate</button>
+                </div>
+            </div>
+            <div class="status-message hidden" id="statusMessage"></div>
+        </div>
+
+        <footer class="site-footer">
+            <p>Created by Vidith Phillips | <a href="https://github.com/VidithPhillips/iris-track" target="_blank">View on GitHub</a></p>
+        </footer>
     </div>
     <script src="js/faceTracking.js"></script>
     <script src="js/main.js"></script>

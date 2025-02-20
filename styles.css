@@ -18,6 +18,12 @@ body {
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    border: 2px solid rgba(0, 230, 118, 0.1);
+}
+
+.container:hover {
+    transform: scale(1.01);
 }
 
 .input-video {
@@ -107,39 +113,86 @@ body {
     display: none;
 }
 
-/* Add after other overlay styles */
-.permission-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.9);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 20;
-}
-
-.permission-content {
-    background: #2c2c2c;
-    padding: 20px;
-    border-radius: 8px;
-    text-align: center;
-    color: white;
-}
-
+/* Remove permission-related styles since we're not using them */
+.permission-overlay,
+.permission-content,
 .permission-content button {
-    padding: 10px 20px;
-    background: #00E676;
-    border: none;
-    border-radius: 4px;
-    color: #000;
-    cursor: pointer;
-    margin-top: 15px;
-    font-size: 16px;
+    display: none;
 }
 
-.permission-content button:hover {
-    background: #00c853;
+.page-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.site-header {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #fff;
+}
+
+.site-header h1 {
+    font-size: 2.5em;
+    margin: 0;
+    color: #00E676;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.subtitle {
+    font-size: 1.2em;
+    color: #aaa;
+    margin: 10px 0;
+}
+
+.instructions {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 20px 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    color: #fff;
+    max-width: 600px;
+}
+
+.instructions h2 {
+    color: #00E676;
+    margin-top: 0;
+}
+
+.instructions ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.instructions li {
+    margin: 10px 0;
+    padding-left: 24px;
+    position: relative;
+}
+
+.instructions li:before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #00E676;
+}
+
+.site-footer {
+    margin-top: 30px;
+    text-align: center;
+    color: #aaa;
+}
+
+.site-footer a {
+    color: #00E676;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.site-footer a:hover {
+    color: #fff;
 } 
