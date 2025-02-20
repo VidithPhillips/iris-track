@@ -88,6 +88,14 @@ class FaceTracker {
         // Add error tracking
         this.errorCount = 0;
         this.maxErrors = 5;
+
+        // Add iris tracking parameters
+        this.irisTracking = {
+            left: { x: 0, y: 0, angle: 0 },
+            right: { x: 0, y: 0, angle: 0 },
+            baselineSet: false,
+            baseline: { left: { x: 0, y: 0 }, right: { x: 0, y: 0 } }
+        };
     }
 
     async initialize(videoElement, canvasElement) {
@@ -152,6 +160,34 @@ class FaceTracker {
         // Calculate and display distance
         const distance = this.calculateDistance(results.faceLandmarks);
         this.displayDistance(distance);
+
+        if (results.faceLandmarks) {
+            this.landmarks = results.faceLandmarks;  // Store landmarks for reference
+
+            // Calculate iris positions
+            const leftIris = results.faceLandmarks.slice(468, 472);
+            const rightIris = results.faceLandmarks.slice(473, 477);
+
+            const leftPosition = this.calculateIrisPosition(leftIris, true);
+            const rightPosition = this.calculateIrisPosition(rightIris, false);
+
+            if (leftPosition && rightPosition) {
+                this.irisTracking.left = leftPosition;
+                this.irisTracking.right = rightPosition;
+
+                // Set baseline if not set
+                if (!this.irisTracking.baselineSet) {
+                    this.irisTracking.baseline = {
+                        left: { ...leftPosition },
+                        right: { ...rightPosition }
+                    };
+                    this.irisTracking.baselineSet = true;
+                }
+
+                // Display iris tracking data
+                this.displayIrisTracking();
+            }
+        }
     }
 
     drawFaceOutline(landmarks) {
@@ -323,5 +359,70 @@ class FaceTracker {
             return previous; // Too big a jump, probably error
         }
         return factor * previous + (1 - factor) * current;
+    }
+
+    // Add after drawIris method
+    calculateIrisPosition(irisLandmarks, isLeft) {
+        if (irisLandmarks.length < 4) return null;
+
+        // Calculate iris center
+        const center = {
+            x: irisLandmarks.reduce((sum, pt) => sum + pt.x, 0) / irisLandmarks.length,
+            y: irisLandmarks.reduce((sum, pt) => sum + pt.y, 0) / irisLandmarks.length
+        };
+
+        // Get eye corners for reference
+        const eyeCorners = isLeft ? 
+            [this.landmarks[263], this.landmarks[362]] :  // Left eye corners
+            [this.landmarks[33], this.landmarks[133]];    // Right eye corners
+
+        // Calculate eye center
+        const eyeCenter = {
+            x: (eyeCorners[0].x + eyeCorners[1].x) / 2,
+            y: (eyeCorners[0].y + eyeCorners[1].y) / 2
+        };
+
+        // Calculate relative position (compensating for head movement)
+        const relativeX = center.x - eyeCenter.x;
+        const relativeY = center.y - eyeCenter.y;
+
+        // Calculate angle in degrees
+        const angle = Math.atan2(relativeY, relativeX) * (180 / Math.PI);
+
+        // Compensate for head roll
+        const compensatedAngle = angle - this.headPose.roll;
+
+        return {
+            x: relativeX * this.canvas.width,  // Convert to pixels
+            y: relativeY * this.canvas.height,
+            angle: compensatedAngle
+        };
+    }
+
+    // Add new method to display iris tracking
+    displayIrisTracking() {
+        const startX = 20;
+        const startY = 200;  // Position below other measurements
+        const lineSpacing = 25;
+
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = this.colors.text;
+
+        // Display baseline-relative calculations
+        const leftDeltaAngle = (this.irisTracking.left.angle - this.irisTracking.baseline.left.angle).toFixed(1);
+        const rightDeltaAngle = (this.irisTracking.right.angle - this.irisTracking.baseline.right.angle).toFixed(1);
+
+        // Draw background for formulas
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(startX - 5, startY - 20, 300, 100);
+        this.ctx.fillStyle = this.colors.text;
+
+        // Display real-time calculations
+        this.ctx.fillText(`Left Iris Δ° = ${leftDeltaAngle}° (${this.irisTracking.left.angle.toFixed(1)}° - ${this.irisTracking.baseline.left.angle.toFixed(1)}°)`, 
+            startX, startY);
+        this.ctx.fillText(`Right Iris Δ° = ${rightDeltaAngle}° (${this.irisTracking.right.angle.toFixed(1)}° - ${this.irisTracking.baseline.right.angle.toFixed(1)}°)`, 
+            startX, startY + lineSpacing);
+        this.ctx.fillText(`Average Eye Movement: ${((parseFloat(leftDeltaAngle) + parseFloat(rightDeltaAngle)) / 2).toFixed(1)}°`, 
+            startX, startY + lineSpacing * 2);
     }
 } 
