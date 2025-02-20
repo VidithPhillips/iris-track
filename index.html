@@ -11,8 +11,17 @@
 </head>
 <body>
     <div class="container">
-        <video class="input-video" width="640" height="480" autoplay></video>
+        <video class="input-video" width="640" height="480" autoplay playsinline muted></video>
         <canvas class="output-canvas" width="640" height="480"></canvas>
+        <div class="calibration-overlay hidden" id="calibrationOverlay">
+            <div class="calibration-content">
+                <h3>Distance Calibration</h3>
+                <p>Enter your actual face width (temple to temple) in cm:</p>
+                <input type="number" id="faceWidth" value="15" min="10" max="20" step="0.5">
+                <button id="calibrateBtn">Calibrate</button>
+            </div>
+        </div>
+        <div class="status-message hidden" id="statusMessage"></div>
     </div>
     <script src="js/faceTracking.js"></script>
     <script src="js/main.js"></script>

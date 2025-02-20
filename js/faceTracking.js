@@ -15,7 +15,21 @@ const FACEMESH_TESSELATION = [
     [97, 96], [96, 95], [95, 97], [78, 62], [62, 96], [96, 78],
     [19, 18], [18, 70], [70, 19], [61, 60], [60, 166], [166, 61],
     [178, 179], [179, 180], [180, 178], [189, 190], [190, 191], [191, 189]
-]; 
+];
+
+const FACEMESH_RIGHT_EYE = [
+    [33, 7], [7, 163], [163, 144], [144, 145], [145, 153],
+    [153, 154], [154, 155], [155, 133], [33, 246], [246, 161],
+    [161, 160], [160, 159], [159, 158], [158, 157], [157, 173],
+    [173, 133]
+];
+
+const FACEMESH_LEFT_EYE = [
+    [362, 382], [382, 381], [381, 380], [380, 374], [374, 373],
+    [373, 390], [390, 249], [249, 263], [263, 466], [466, 388],
+    [388, 387], [387, 386], [386, 385], [385, 384], [384, 398],
+    [398, 362]
+];
 
 class FaceTracker {
     constructor() {
@@ -26,7 +40,7 @@ class FaceTracker {
         });
 
         this.holistic.setOptions({
-            modelComplexity: 0,  // Set to 0 for better performance
+            modelComplexity: 0,  // Lower complexity for better performance
             smoothLandmarks: true,
             enableSegmentation: false,
             refineFaceLandmarks: true,
@@ -62,6 +76,18 @@ class FaceTracker {
                 z: '#4444FF'
             }
         };
+
+        // Update distance calibration
+        this.distanceCalibration = {
+            FACE_WIDTH_CM: 15,
+            focalLength: null,
+            isCalibrated: false,
+            knownDistance: 60  // Calibration distance in cm
+        };
+
+        // Add error tracking
+        this.errorCount = 0;
+        this.maxErrors = 5;
     }
 
     async initialize(videoElement, canvasElement) {
@@ -73,7 +99,15 @@ class FaceTracker {
 
         this.camera = new Camera(this.video, {
             onFrame: async () => {
-                await this.holistic.send({image: this.video});
+                try {
+                    await this.holistic.send({image: this.video});
+                    this.errorCount = 0;
+                } catch (error) {
+                    this.errorCount++;
+                    if (this.errorCount >= this.maxErrors) {
+                        this.showError('Face tracking failed. Please refresh the page.');
+                    }
+                }
             },
             width: 640,
             height: 480
@@ -82,28 +116,52 @@ class FaceTracker {
         await this.camera.start();
     }
 
+    showError(message) {
+        const statusEl = document.getElementById('statusMessage');
+        statusEl.textContent = message;
+        statusEl.classList.remove('hidden');
+    }
+
+    cleanup() {
+        if (this.camera) {
+            this.camera.stop();
+        }
+        if (this.holistic) {
+            this.holistic.close();
+        }
+    }
+
     onResults(results) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.fillStyle = `rgba(0, 0, 0, ${this.backgroundAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        if (results.faceLandmarks) {
-            // Draw face mesh
-            drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
-                {color: this.colors.face.mesh, lineWidth: 1});
-            
-            // Draw face outline
-            this.drawFaceOutline(results.faceLandmarks);
-            
-            // Draw eyes
-            this.drawEnhancedEyes(results.faceLandmarks);
-
-            if (results.poseLandmarks) {
-                this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
-                this.drawHeadAxes();
-                this.displayHeadPose();
-            }
+        if (!results.faceLandmarks) {
+            this.ctx.font = '24px Arial';
+            this.ctx.fillStyle = '#fff';
+            this.ctx.fillText('No face detected', this.canvas.width/2 - 70, this.canvas.height/2);
+            return;
         }
+
+        // Draw face mesh
+        drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
+            {color: this.colors.face.mesh, lineWidth: 1});
+        
+        // Draw face outline
+        this.drawFaceOutline(results.faceLandmarks);
+        
+        // Draw eyes
+        this.drawEnhancedEyes(results.faceLandmarks);
+
+        if (results.poseLandmarks) {
+            this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
+            this.drawHeadAxes();
+            this.displayHeadPose();
+        }
+
+        // Calculate and display distance
+        const distance = this.calculateDistance(results.faceLandmarks);
+        this.displayDistance(distance);
     }
 
     drawFaceOutline(landmarks) {
@@ -230,5 +288,45 @@ class FaceTracker {
         this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset);
         this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 25);
         this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 50);
+    }
+
+    calculateDistance(landmarks) {
+        const leftFace = landmarks[234];
+        const rightFace = landmarks[454];
+        
+        const faceWidthPixels = Math.hypot(
+            (rightFace.x - leftFace.x) * this.canvas.width,
+            (rightFace.y - leftFace.y) * this.canvas.height
+        );
+
+        // More accurate distance calculation with calibration
+        const distance = (this.distanceCalibration.FACE_WIDTH_CM * this.canvas.width) / faceWidthPixels;
+        
+        // Apply smoothing
+        return this.smoothValue(distance, this.lastDistance || distance, 0.3);
+    }
+
+    displayDistance(distance) {
+        this.ctx.font = '16px Arial';
+        this.ctx.fillStyle = this.colors.text;
+        this.ctx.fillText(`Distance: ${distance.toFixed(1)} cm`, 20, 90);
+    }
+
+    // Add calibration method
+    calibrate(actualFaceWidth) {
+        this.distanceCalibration.FACE_WIDTH_CM = actualFaceWidth;
+        this.distanceCalibration.isCalibrated = true;
+        
+        // Hide calibration overlay
+        document.getElementById('calibrationOverlay').classList.add('hidden');
+    }
+
+    // Add smoothing helper
+    smoothValue(current, previous, factor) {
+        if (!previous) return current;
+        if (Math.abs(current - previous) > 50) {
+            return previous; // Too big a jump, probably error
+        }
+        return factor * previous + (1 - factor) * current;
     }
 } 
