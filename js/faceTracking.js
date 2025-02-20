@@ -62,6 +62,40 @@ class FaceTracker {
                 z: '#4444FF'   // Blue for forward/back
             }
         };
+
+        // Add iris tracking parameters
+        this.irisParams = {
+            radius: 5,
+            color: '#FFD700',
+            pupilColor: '#000000',
+            pupilRadius: 2
+        };
+
+        // Add body tracking parameters
+        this.bodyParams = {
+            joints: {
+                color: '#00E676',
+                radius: 4
+            },
+            connections: {
+                color: 'rgba(0, 230, 118, 0.5)',
+                width: 2
+            }
+        };
+
+        // Define body connections for better visualization
+        this.bodyConnections = [
+            // Torso
+            [11, 12], // shoulders
+            [11, 23], [12, 24], // shoulders to hips
+            [23, 24], // hips
+            // Arms
+            [11, 13], [13, 15], // left arm
+            [12, 14], [14, 16], // right arm
+            // Legs
+            [23, 25], [25, 27], // left leg
+            [24, 26], [26, 28]  // right leg
+        ];
     }
 
     async initialize(videoElement, canvasElement) {
@@ -99,6 +133,7 @@ class FaceTracker {
 
             if (results.poseLandmarks) {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
+                this.drawDetailedBody(results.poseLandmarks);  // Add detailed body tracking
                 this.drawHeadAxes();
                 this.displayHeadPose();
             }
@@ -126,11 +161,56 @@ class FaceTracker {
     }
 
     drawEnhancedEyes(landmarks) {
-        // Draw eyes
+        // Draw eye contours
         drawConnectors(this.ctx, landmarks, FACEMESH_RIGHT_EYE, 
             {color: this.colors.face.eyes, lineWidth: 2});
         drawConnectors(this.ctx, landmarks, FACEMESH_LEFT_EYE,
             {color: this.colors.face.eyes, lineWidth: 2});
+
+        // Draw iris and pupils
+        // Right eye iris (landmarks 473-477)
+        this.drawIris(landmarks.slice(473, 477));
+        // Left eye iris (landmarks 468-472)
+        this.drawIris(landmarks.slice(468, 472));
+    }
+
+    drawIris(irisLandmarks) {
+        if (irisLandmarks.length < 4) return;
+
+        // Calculate iris center
+        const centerX = irisLandmarks.reduce((sum, pt) => sum + pt.x, 0) / irisLandmarks.length;
+        const centerY = irisLandmarks.reduce((sum, pt) => sum + pt.y, 0) / irisLandmarks.length;
+
+        // Calculate iris size
+        const distance = Math.hypot(
+            (irisLandmarks[0].x - irisLandmarks[2].x) * this.canvas.width,
+            (irisLandmarks[0].y - irisLandmarks[2].y) * this.canvas.height
+        );
+
+        // Draw iris
+        this.ctx.beginPath();
+        this.ctx.arc(
+            centerX * this.canvas.width,
+            centerY * this.canvas.height,
+            distance/2,
+            0,
+            2 * Math.PI
+        );
+        this.ctx.strokeStyle = this.irisParams.color;
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+
+        // Draw pupil
+        this.ctx.beginPath();
+        this.ctx.arc(
+            centerX * this.canvas.width,
+            centerY * this.canvas.height,
+            distance/4,
+            0,
+            2 * Math.PI
+        );
+        this.ctx.fillStyle = this.irisParams.pupilColor;
+        this.ctx.fill();
     }
 
     calculateHeadPose(poseLandmarks, faceLandmarks) {
@@ -148,23 +228,55 @@ class FaceTracker {
 
     drawHeadAxes() {
         const position = {x: this.canvas.width - 150, y: 120};
-        const axisLength = 50;
+        const axisLength = 60;
 
         this.ctx.save();
         this.ctx.translate(position.x, position.y);
 
-        // Draw axes
-        ['x', 'y', 'z'].forEach((axis, i) => {
-            this.ctx.strokeStyle = this.colors.axis[axis];
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            const angle = this.headPose[['yaw', 'pitch', 'roll'][i]] * Math.PI / 180;
-            this.ctx.lineTo(
-                Math.cos(angle) * axisLength,
-                Math.sin(angle) * axisLength
-            );
-            this.ctx.stroke();
-        });
+        // Draw background for the visualization
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.fillRect(-80, -80, 160, 160);
+        
+        // Draw axis labels
+        this.ctx.font = '14px Arial';
+        
+        // Draw head direction visualization
+        const { yaw, pitch, roll } = this.headPose;
+        
+        // Draw horizontal axis (Yaw - left/right)
+        this.ctx.strokeStyle = this.colors.axis.x;
+        this.ctx.fillStyle = this.colors.axis.x;
+        this.ctx.beginPath();
+        this.ctx.moveTo(-axisLength, 0);
+        this.ctx.lineTo(axisLength, 0);
+        this.ctx.stroke();
+        this.ctx.fillText(`Left/Right: ${yaw.toFixed(1)}°`, -70, -50);
+        
+        // Draw indicator for current yaw
+        this.ctx.beginPath();
+        this.ctx.arc(yaw * axisLength/90, 0, 4, 0, 2 * Math.PI);
+        this.ctx.fill();
+
+        // Draw vertical axis (Pitch - up/down)
+        this.ctx.strokeStyle = this.colors.axis.y;
+        this.ctx.fillStyle = this.colors.axis.y;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, -axisLength);
+        this.ctx.lineTo(0, axisLength);
+        this.ctx.stroke();
+        this.ctx.fillText(`Up/Down: ${pitch.toFixed(1)}°`, -70, -30);
+        
+        // Draw indicator for current pitch
+        this.ctx.beginPath();
+        this.ctx.arc(0, pitch * axisLength/90, 4, 0, 2 * Math.PI);
+        this.ctx.fill();
+
+        // Draw roll indicator (circular)
+        this.ctx.strokeStyle = this.colors.axis.z;
+        this.ctx.fillStyle = this.colors.axis.z;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, axisLength/2, 0, 2 * Math.PI);
+        this.ctx.stroke();
 
         this.ctx.restore();
     }
@@ -175,5 +287,52 @@ class FaceTracker {
         this.ctx.fillText(`Yaw: ${this.headPose.yaw.toFixed(1)}°`, 20, 30);
         this.ctx.fillText(`Pitch: ${this.headPose.pitch.toFixed(1)}°`, 20, 50);
         this.ctx.fillText(`Roll: ${this.headPose.roll.toFixed(1)}°`, 20, 70);
+    }
+
+    drawDetailedBody(poseLandmarks) {
+        if (!poseLandmarks) return;
+
+        // Draw all body landmarks
+        poseLandmarks.forEach((landmark, index) => {
+            // Draw joint point
+            this.ctx.beginPath();
+            this.ctx.arc(
+                landmark.x * this.canvas.width,
+                landmark.y * this.canvas.height,
+                this.bodyParams.joints.radius,
+                0,
+                2 * Math.PI
+            );
+            this.ctx.fillStyle = this.bodyParams.joints.color;
+            this.ctx.fill();
+
+            // Add landmark number for debugging
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.font = '10px Arial';
+            this.ctx.fillText(
+                index.toString(),
+                landmark.x * this.canvas.width + 5,
+                landmark.y * this.canvas.height + 5
+            );
+        });
+
+        // Draw connections between joints
+        this.bodyConnections.forEach(([start, end]) => {
+            const startPoint = poseLandmarks[start];
+            const endPoint = poseLandmarks[end];
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(
+                startPoint.x * this.canvas.width,
+                startPoint.y * this.canvas.height
+            );
+            this.ctx.lineTo(
+                endPoint.x * this.canvas.width,
+                endPoint.y * this.canvas.height
+            );
+            this.ctx.strokeStyle = this.bodyParams.connections.color;
+            this.ctx.lineWidth = this.bodyParams.connections.width;
+            this.ctx.stroke();
+        });
     }
 } 
