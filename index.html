@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Head Tracking Visualization</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Try different MediaPipe versions -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic"></script>
 </head>
 <body>
     <div class="container">
@@ -24,7 +24,6 @@
         </div>
         <div class="status-message hidden" id="statusMessage"></div>
     </div>
-    <!-- Load custom scripts after MediaPipe -->
     <script src="js/faceTracking.js"></script>
     <script src="js/main.js"></script>
 </body>

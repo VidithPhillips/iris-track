@@ -42,7 +42,8 @@ class FaceTracker {
         this.holistic.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
-            enableSegmentation: false,
+            enableSegmentation: true,
+            smoothSegmentation: true,
             refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
@@ -90,31 +91,21 @@ class FaceTracker {
     }
 
     async initialize(videoElement, canvasElement) {
-        try {
-            this.video = videoElement;
-            this.canvas = canvasElement;
-            this.ctx = canvasElement.getContext('2d');
+        this.video = videoElement;
+        this.canvas = canvasElement;
+        this.ctx = canvasElement.getContext('2d');
 
-            // Set up holistic first
-            this.holistic.onResults(this.onResults.bind(this));
+        this.holistic.onResults(this.onResults.bind(this));
 
-            // Initialize camera with error handling
-            this.camera = new Camera(this.video, {
-                onFrame: async () => {
-                    await this.holistic.send({image: this.video});
-                },
-                width: 640,
-                height: 480
-            });
+        this.camera = new Camera(this.video, {
+            onFrame: async () => {
+                await this.holistic.send({image: this.video});
+            },
+            width: 640,
+            height: 480
+        });
 
-            console.log('Starting camera...');
-            await this.camera.start();
-            console.log('Camera started successfully');
-
-        } catch (error) {
-            console.error('Error in FaceTracker initialization:', error);
-            throw new Error('Failed to initialize face tracking: ' + error.message);
-        }
+        await this.camera.start();
     }
 
     showError(message) {
