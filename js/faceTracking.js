@@ -19,22 +19,50 @@ const FACEMESH_LEFT_EYE = [
 
 class FaceTracker {
     constructor() {
+        // Basic initialization
         this.holistic = new Holistic({
             locateFile: (file) => {
                 return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
             }
         });
 
+        // Essential settings
         this.holistic.setOptions({
             modelComplexity: 1,
             smoothLandmarks: true,
-            enableSegmentation: false,
-            smoothSegmentation: true,
             refineFaceLandmarks: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5,
-            selfieMode: true  // Add this if camera is mirrored
+            selfieMode: true
         });
+
+        // Core parameters
+        this.smoothingFactor = 0.7;
+        this.backgroundAlpha = 0.3;
+
+        // Head pose tracking
+        this.headPose = {
+            pitch: 0,
+            yaw: 0,
+            roll: 0
+        };
+
+        // Simple color scheme
+        this.colors = {
+            primary: '#00E676',
+            text: '#FFFFFF',
+            face: {
+                mesh: 'rgba(255, 255, 255, 0.1)',
+                outline: 'rgba(255, 255, 255, 0.3)',
+                eyes: '#00E676',
+                iris: '#FFD700'
+            },
+            axis: {
+                x: '#FF4444',  // Red for left/right
+                y: '#44FF44',  // Green for up/down
+                z: '#4444FF'   // Blue for forward/back
+            }
+        };
 
         // Add known measurements for distance calculation
         this.KNOWN_FACE_WIDTH = 0.15;  // Keep this for basic distance calculation
@@ -60,17 +88,6 @@ class FaceTracker {
             roll: 0
         };
         this.angleSmoothingFactor = 0.92; // Increased for more stability
-
-        // Clean color scheme
-        this.colors = {
-            primary: '#00E676',    // Green for main elements
-            text: '#FFFFFF',       // White text
-            axis: {
-                x: '#FF4444',      // Red for left/right axis
-                y: '#44FF44',      // Green for up/down axis
-                z: '#4444FF'       // Blue for forward/back axis
-            }
-        };
 
         // Head movement visualization
         this.headVisualization = {
@@ -106,44 +123,22 @@ class FaceTracker {
     }
 
     onResults(results) {
-        // Add semi-transparent background
+        // Clear background
         this.ctx.fillStyle = `rgba(0, 0, 0, ${this.backgroundAlpha})`;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Check for face mesh results from holistic
         if (results.faceLandmarks) {
-            // Apply smoothing to landmarks
-            const smoothedLandmarks = this.smoothLandmarks(results.faceLandmarks);
-            
-            // Create face outline for better visual context
-            this.drawFaceOutline(smoothedLandmarks);
+            // Draw face mesh
+            drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
+                {color: this.colors.face.mesh, lineWidth: 0.5});
 
-            // Draw face mesh with reduced opacity
-            drawConnectors(this.ctx, smoothedLandmarks, FACEMESH_TESSELATION, 
-                {color: '#C0C0C030', lineWidth: 0.5});
-            
-            // Draw eyes with enhanced visibility
-            this.drawEnhancedEyes(smoothedLandmarks);
-
-            // Draw iris
-            const leftIris = smoothedLandmarks.slice(468, 472);
-            const rightIris = smoothedLandmarks.slice(473, 477);
-            
-            this.drawEnhancedIris(leftIris, '#30FF30');
-            this.drawEnhancedIris(rightIris, '#FF3030');
-
-            // Calculate and display distance
-            const distance = this.calculateDistance(smoothedLandmarks);
-            this.displayDistance(distance);
-
-            // If we have both pose and face landmarks, calculate head pose
             if (results.poseLandmarks) {
+                // Calculate head pose
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
                 
-                // Draw only essential elements
+                // Draw visualizations
                 this.drawBodyPose(results.poseLandmarks);
-                this.drawHeadAxes();  // New axis visualization
-                this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
+                this.drawHeadAxes();
                 this.displayHeadPose();
             }
         }
@@ -296,16 +291,14 @@ class FaceTracker {
         const yOffset = 50;
         this.ctx.font = '16px Arial';
         
-        // Background
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, yOffset, 250, 120);
+        this.ctx.fillRect(10, yOffset, 200, 100);
         
-        // Labels with descriptions
         this.ctx.fillStyle = this.colors.text;
         this.ctx.fillText('Head Position:', 20, yOffset + 25);
-        this.ctx.fillText(`${this.labels.headPose.yaw}: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 50);
-        this.ctx.fillText(`${this.labels.headPose.pitch}: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 75);
-        this.ctx.fillText(`${this.labels.headPose.roll}: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 100);
+        this.ctx.fillText(`Left/Right: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 50);
+        this.ctx.fillText(`Up/Down: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 75);
+        this.ctx.fillText(`Tilt: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 100);
     }
 
     drawBodyPose(poseLandmarks) {
@@ -655,41 +648,45 @@ class FaceTracker {
 
     // New method to draw head rotation axes
     drawHeadAxes() {
-        const { axisLength, position, labels } = this.headVisualization;
-        const { pitch, yaw, roll } = this.headPose;
+        const position = {x: this.canvas.width - 150, y: 120};
+        const axisLength = 50;
 
         this.ctx.save();
         this.ctx.translate(position.x, position.y);
 
-        // Draw axis lines with labels
-        // X-axis (left/right)
-        this.drawAxis(
-            axisLength, 
-            yaw,           // Use yaw angle for x-axis
-            this.colors.axis.x, 
-            labels.x
+        // X axis (left/right)
+        this.drawSingleAxis(
+            axisLength,
+            this.headPose.yaw,
+            this.colors.axis.x,
+            'Left/Right'
         );
 
-        // Y-axis (up/down)
-        this.drawAxis(
-            axisLength, 
-            pitch,         // Use pitch angle for y-axis
-            this.colors.axis.y, 
-            labels.y,
-            Math.PI/2     // Rotate 90 degrees for vertical
+        // Y axis (up/down)
+        this.drawSingleAxis(
+            axisLength,
+            this.headPose.pitch,
+            this.colors.axis.y,
+            'Up/Down',
+            Math.PI/2
         );
 
-        // Z-axis (forward/back) - shown as a circle that changes size
-        this.drawZAxis(axisLength, roll, labels.z);
+        // Z axis (forward/back)
+        this.drawSingleAxis(
+            axisLength,
+            this.headPose.roll,
+            this.colors.axis.z,
+            'Forward/Back'
+        );
 
         this.ctx.restore();
     }
 
-    drawAxis(length, angle, color, label, baseRotation = 0) {
+    drawSingleAxis(length, angle, color, label, rotation = 0) {
         this.ctx.save();
-        this.ctx.rotate(baseRotation);
+        this.ctx.rotate(rotation);
 
-        // Draw base line
+        // Base line
         this.ctx.beginPath();
         this.ctx.strokeStyle = color;
         this.ctx.lineWidth = 2;
@@ -697,44 +694,18 @@ class FaceTracker {
         this.ctx.lineTo(length/2, 0);
         this.ctx.stroke();
 
-        // Draw angle indicator
-        this.ctx.beginPath();
+        // Angle indicator
         this.ctx.rotate(angle * Math.PI/180);
+        this.ctx.beginPath();
         this.ctx.moveTo(0, 0);
         this.ctx.lineTo(length/2, 0);
-        this.ctx.strokeStyle = color;
         this.ctx.lineWidth = 3;
         this.ctx.stroke();
 
-        // Add label
+        // Label
         this.ctx.fillStyle = color;
-        this.ctx.font = '14px Arial';
-        this.ctx.fillText(`${label}: ${angle.toFixed(1)}°`, length/2 + 10, 0);
+        this.ctx.fillText(`${label}: ${angle.toFixed(1)}°`, -length/2, -10);
 
         this.ctx.restore();
-    }
-
-    drawZAxis(length, angle, label) {
-        // Draw circular indicator for Z-axis
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = this.colors.axis.z;
-        this.ctx.lineWidth = 2;
-        this.ctx.arc(0, 0, length/4, 0, 2 * Math.PI);
-        this.ctx.stroke();
-
-        // Add rotation indicator
-        this.ctx.save();
-        this.ctx.rotate(angle * Math.PI/180);
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, -length/4);
-        this.ctx.lineTo(0, length/4);
-        this.ctx.strokeStyle = this.colors.axis.z;
-        this.ctx.lineWidth = 3;
-        this.ctx.stroke();
-        this.ctx.restore();
-
-        // Add label
-        this.ctx.fillStyle = this.colors.axis.z;
-        this.ctx.fillText(`${label}: ${angle.toFixed(1)}°`, -length/2, length/2 + 20);
     }
 } 
