@@ -43,4 +43,17 @@ The application uses facial landmarks to:
 3. Allow camera access when prompted
 
 ## Note
-This application requires camera access and works best in modern browsers with good lighting conditions. 
+This application requires camera access and works best in modern browsers with good lighting conditions.
+
+## Iris Track with GPU Acceleration
+
+## Setup with Google Colab
+1. Open the provided Colab notebook
+2. Run the GPU server cells
+3. Connect the web application to the GPU server
+4. Start tracking with improved performance
+
+## Requirements
+- Google Colab with GPU runtime
+- WebSocket support
+- TensorFlow 2.x 

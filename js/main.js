@@ -8,4 +8,8 @@ async function initialize() {
     await faceTracker.initialize(video, canvas);
 }
 
-initialize(); 
+initialize();
+
+document.getElementById('calibrate').addEventListener('click', () => {
+    faceTracker.calibrateDistance();
+}); 

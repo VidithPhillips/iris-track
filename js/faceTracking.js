@@ -137,56 +137,16 @@ class FaceTracker {
         ];
     }
 
-    async processFrame(video) {
-        // Convert video frame to base64
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        const base64Frame = canvas.toDataURL('image/jpeg').split(',')[1];
-
-        try {
-            // Send to GPU server
-            const response = await fetch(this.gpuEndpoint + '/process', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    image: base64Frame
-                })
-            });
-
-            const results = await response.json();
-            this.onResults(results);
-        } catch (error) {
-            console.error('GPU processing error:', error);
-        }
-    }
-
-    handleServerResponse(event) {
-        const results = JSON.parse(event.data);
-        
-        // Average results for smoothing
-        const smoothedResults = this.smoothFrames(results);
-        this.onResults(smoothedResults);
-    }
-
-    smoothFrames(frames) {
-        // Average landmark positions across frames
-        // ... smoothing logic ...
-    }
-
     async initialize(videoElement, canvasElement) {
         this.video = videoElement;
         this.canvas = canvasElement;
         this.ctx = canvasElement.getContext('2d');
 
-        // Replace Holistic with our GPU processing
+        this.holistic.onResults(this.onResults.bind(this));
+
         this.camera = new Camera(this.video, {
             onFrame: async () => {
-                await this.processFrame(this.video);
+                await this.holistic.send({image: this.video});
             },
             width: 640,
             height: 480
@@ -201,8 +161,10 @@ class FaceTracker {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (results.faceLandmarks) {
-            // Draw basic face features
             this.drawFaceOutline(results.faceLandmarks);
+            drawConnectors(this.ctx, results.faceLandmarks, FACEMESH_TESSELATION, 
+                {color: this.colors.face.mesh, lineWidth: 1});
+            
             this.drawEnhancedEyes(results.faceLandmarks);
 
             if (results.poseLandmarks) {
