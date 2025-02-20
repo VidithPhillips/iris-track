@@ -1,59 +1,17 @@
-# Face and Iris Tracking with Distance Calculator
+# Head Tracking Visualization
 
-A sophisticated real-time face tracking application that combines iris detection with distance calculation using MediaPipe and WebRTC.
-
-## Live Demo
-Visit [https://vidithphillips.github.io/iris-track](https://vidithphillips.github.io/iris-track)
+Real-time face and head pose tracking using MediaPipe.
 
 ## Features
-- Real-time face mesh tracking with MediaPipe
-- Precise iris detection and tracking
-- Distance calculation between camera and subject
-- Stable tracking with background segmentation
-- Calibration options for accurate measurements
-- WebRTC camera integration
-- No backend required
-- Responsive UI with real-time feedback
+- Face mesh tracking
+- Eye and iris detection
+- Head pose angles (yaw, pitch, roll)
+- Real-time visualization
 
-## How It Works
-The application uses facial landmarks to:
-1. Track the face mesh in real-time
-2. Detect and highlight iris positions
-3. Calculate distance using known face width and focal length
-4. Provide real-time distance measurements
-5. Maintain visual stability using background masking
-
-## Technologies Used
-- MediaPipe Face Mesh
-- WebRTC
-- HTML5 Canvas
-- JavaScript
-- CSS3 for modern UI
-
-## Usage Tips
-- Ensure good lighting conditions
-- Keep your face centered in the frame
-- Maintain a distance of 0.5-2 meters from the camera
-- Use Chrome or Firefox for best performance
-- Allow camera access when prompted
-
-## Local Development
+## Setup
 1. Clone the repository
 2. Open index.html in a web browser
 3. Allow camera access when prompted
 
 ## Note
-This application requires camera access and works best in modern browsers with good lighting conditions.
-
-## Iris Track with GPU Acceleration
-
-## Setup with Google Colab
-1. Open the provided Colab notebook
-2. Run the GPU server cells
-3. Connect the web application to the GPU server
-4. Start tracking with improved performance
-
-## Requirements
-- Google Colab with GPU runtime
-- WebSocket support
-- TensorFlow 2.x 
+This application requires camera access and works best in modern browsers with good lighting conditions. 
