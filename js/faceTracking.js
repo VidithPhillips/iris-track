@@ -37,8 +37,8 @@ class FaceTracker {
         });
 
         // Add known measurements for distance calculation
-        this.KNOWN_FACE_WIDTH = 0.15; // Average face width in meters
-        this.FOCAL_LENGTH = 615; // Focal length in pixels (can be calibrated)
+        this.KNOWN_FACE_WIDTH = 0.15;  // Keep this for basic distance calculation
+        this.FOCAL_LENGTH = 615;
 
         // Add tracking stability parameters
         this.previousLandmarks = null;
@@ -63,17 +63,15 @@ class FaceTracker {
 
         // Modern color scheme
         this.colors = {
-            primary: '#00E676',    // Bright green for main elements
-            secondary: '#FFFFFF',   // White for supporting elements
-            accent: '#FFD700',     // Gold for highlights
+            primary: '#00E676',    // Main green
+            secondary: '#FFD700',  // Gold for important indicators
             text: '#FFFFFF',       // White text
-            background: 'rgba(0, 0, 0, 0.7)', // Semi-transparent black
+            background: 'rgba(0, 0, 0, 0.7)',
             face: {
-                mesh: 'rgba(255, 255, 255, 0.1)',  // Subtle white for face mesh
-                outline: 'rgba(255, 255, 255, 0.4)', // More visible white for outline
-                leftEye: '#00E676',  // Green for left eye
-                rightEye: '#00E676', // Green for right eye
-                iris: '#FFD700'      // Gold for iris
+                mesh: 'rgba(255, 255, 255, 0.1)',
+                outline: 'rgba(255, 255, 255, 0.3)',
+                eyes: '#00E676',
+                iris: '#FFD700'
             }
         };
 
@@ -133,6 +131,31 @@ class FaceTracker {
             },
             smoothing: 0.15
         };
+
+        // Remove stability indicator and other unnecessary elements
+        // Add better labeling
+        this.labels = {
+            distance: "Distance from camera",
+            headPose: {
+                yaw: "Left/Right turn",
+                pitch: "Up/Down tilt",
+                roll: "Head tilt"
+            }
+        };
+
+        // Add 3D head direction visualization parameters
+        this.headDirection = {
+            size: 60,           // Size of 3D visualization
+            position: {
+                x: 320,         // Center horizontally
+                y: 100          // Near top of screen
+            },
+            colors: {
+                forward: '#00E676',  // Green for forward direction
+                up: '#FFD700',       // Gold for up direction
+                side: '#FF4444'      // Red for side direction
+            }
+        };
     }
 
     async initialize(videoElement, canvasElement) {
@@ -189,9 +212,8 @@ class FaceTracker {
                 this.calculateHeadPose(results.poseLandmarks, results.faceLandmarks);
                 
                 // Draw visualization elements in correct order
-                this.drawMotionTrail(results.faceLandmarks);
                 this.drawBodyPose(results.poseLandmarks);
-                this.drawHeadDirection(results.faceLandmarks);
+                this.draw3DHeadDirection();  // Replace old direction indicator
                 this.drawNeckLine(results.poseLandmarks, results.faceLandmarks);
                 
                 // Calculate overall movement magnitude for stability indicator
@@ -293,11 +315,16 @@ class FaceTracker {
     }
 
     displayDistance(distance) {
-        this.ctx.font = '24px Arial';
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillRect(10, 10, 250, 35);
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillText(`Distance: ${distance.toFixed(2)} meters`, 20, 35);
+        const yOffset = 10;
+        this.ctx.font = '16px Arial';
+        
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, yOffset, 250, 35);
+        
+        // Distance text
+        this.ctx.fillStyle = this.colors.text;
+        this.ctx.fillText(`${this.labels.distance}: ${distance.toFixed(2)}m`, 20, yOffset + 25);
     }
 
     calculateHeadPose(poseLandmarks, faceLandmarks) {
@@ -346,31 +373,19 @@ class FaceTracker {
     }
 
     displayHeadPose() {
-        // Update transition values
-        this.displayTransition.values.pitch += (this.headPose.pitch - this.displayTransition.values.pitch) * this.displayTransition.smoothing;
-        this.displayTransition.values.yaw += (this.headPose.yaw - this.displayTransition.values.yaw) * this.displayTransition.smoothing;
-        this.displayTransition.values.roll += (this.headPose.roll - this.displayTransition.values.roll) * this.displayTransition.smoothing;
-
         const yOffset = 50;
         this.ctx.font = '16px Arial';
         
-        // Background with gradient
-        const gradient = this.ctx.createLinearGradient(10, yOffset, 260, yOffset + 120);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
-        this.ctx.fillStyle = gradient;
+        // Background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         this.ctx.fillRect(10, yOffset, 250, 120);
         
-        // Add subtle border
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        this.ctx.strokeRect(10, yOffset, 250, 120);
-
-        // Text with smooth transitions
+        // Labels with descriptions
         this.ctx.fillStyle = this.colors.text;
-        this.ctx.fillText('Head Rotation:', 20, yOffset + 20);
-        this.ctx.fillText(`Pitch (Nod): ${this.displayTransition.values.pitch.toFixed(1)}°`, 20, yOffset + 50);
-        this.ctx.fillText(`Yaw (Turn): ${this.displayTransition.values.yaw.toFixed(1)}°`, 20, yOffset + 80);
-        this.ctx.fillText(`Roll (Tilt): ${this.displayTransition.values.roll.toFixed(1)}°`, 20, yOffset + 110);
+        this.ctx.fillText('Head Position:', 20, yOffset + 25);
+        this.ctx.fillText(`${this.labels.headPose.yaw}: ${this.headPose.yaw.toFixed(1)}°`, 20, yOffset + 50);
+        this.ctx.fillText(`${this.labels.headPose.pitch}: ${this.headPose.pitch.toFixed(1)}°`, 20, yOffset + 75);
+        this.ctx.fillText(`${this.labels.headPose.roll}: ${this.headPose.roll.toFixed(1)}°`, 20, yOffset + 100);
     }
 
     drawBodyPose(poseLandmarks) {
@@ -506,70 +521,71 @@ class FaceTracker {
         this.ctx.restore();
     }
 
-    // Replace the complex draw3DPlanes with this simpler visualization
+    // Simplify the head direction indicator
     drawHeadDirection(faceLandmarks) {
-        const { radius, arrowSize, position, colors } = this.directionIndicator;
+        const { radius, position } = this.directionIndicator;
+        const nose = faceLandmarks[1];
         
-        this.ctx.save();
-        this.ctx.translate(position.x, position.y);
-
-        // Draw circular base
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = colors.base;
-        this.ctx.lineWidth = 2;
-        this.ctx.arc(0, 0, radius, 0, 2 * Math.PI);
-        this.ctx.stroke();
-
-        // Calculate combined direction from angles
+        // Calculate combined head movement
         const pitch = this.headPose.pitch * Math.PI / 180;
         const yaw = this.headPose.yaw * Math.PI / 180;
-        const roll = this.headPose.roll * Math.PI / 180;
-
-        // Calculate direction vector
-        const directionX = Math.sin(yaw) * Math.cos(pitch);
-        const directionY = Math.sin(pitch);
-        const magnitude = Math.sqrt(directionX * directionX + directionY * directionY);
-
-        // Only draw arrow if there's significant movement
-        if (magnitude > 0.1) {
-            const angle = Math.atan2(directionY, directionX);
-            
-            // Draw direction arrow
-            this.ctx.shadowColor = this.colors.primary;
-            this.ctx.shadowBlur = 10;
-            this.ctx.strokeStyle = this.colors.primary;
-            this.ctx.lineWidth = 3;
-            
-            // Draw arrow shaft
-            this.ctx.beginPath();
+        
+        // Draw a more prominent direction arrow
+        this.ctx.save();
+        this.ctx.translate(position.x, position.y);
+        
+        // Draw compass-like base
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.lineWidth = 2;
+        
+        // Draw cardinal directions
+        ['N', 'E', 'S', 'W'].forEach((dir, i) => {
+            const angle = i * Math.PI/2;
             this.ctx.moveTo(0, 0);
-            const endX = Math.cos(angle) * radius;
-            const endY = Math.sin(angle) * radius;
-            this.ctx.lineTo(endX, endY);
-            
-            // Draw arrow head
-            const arrowAngle = Math.PI / 6; // 30 degrees
-            this.ctx.lineTo(
-                endX - arrowSize * Math.cos(angle - arrowAngle),
-                endY - arrowSize * Math.sin(angle - arrowAngle)
-            );
-            this.ctx.moveTo(endX, endY);
-            this.ctx.lineTo(
-                endX - arrowSize * Math.cos(angle + arrowAngle),
-                endY - arrowSize * Math.sin(angle + arrowAngle)
-            );
-            this.ctx.stroke();
+            this.ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.fillText(dir, 
+                Math.cos(angle) * (radius + 15),
+                Math.sin(angle) * (radius + 15));
+        });
+        this.ctx.stroke();
 
-            // Reset shadow
-            this.ctx.shadowBlur = 0;
-            
-            // Add magnitude indicator
-            const magnitudeText = `${(magnitude * 100).toFixed(0)}%`;
-            this.ctx.font = '14px Arial';
-            this.ctx.fillStyle = this.colors.primary;
-            this.ctx.fillText(magnitudeText, endX + 10, endY);
-        }
-
+        // Draw head direction
+        const angle = Math.atan2(Math.sin(pitch), Math.sin(yaw));
+        const magnitude = Math.sqrt(pitch * pitch + yaw * yaw) / Math.PI;
+        
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.colors.secondary;
+        this.ctx.lineWidth = 3;
+        this.ctx.shadowColor = this.colors.secondary;
+        this.ctx.shadowBlur = 10;
+        
+        // Draw arrow
+        const arrowLength = radius * Math.min(magnitude, 1);
+        const endX = Math.cos(angle) * arrowLength;
+        const endY = Math.sin(angle) * arrowLength;
+        
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(endX, endY);
+        this.ctx.stroke();
+        
+        // Draw arrow head
+        const headLength = 10;
+        const headAngle = Math.PI / 6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(endX, endY);
+        this.ctx.lineTo(
+            endX - headLength * Math.cos(angle - headAngle),
+            endY - headLength * Math.sin(angle - headAngle)
+        );
+        this.ctx.moveTo(endX, endY);
+        this.ctx.lineTo(
+            endX - headLength * Math.cos(angle + headAngle),
+            endY - headLength * Math.sin(angle + headAngle)
+        );
+        this.ctx.stroke();
+        
         this.ctx.restore();
     }
 
@@ -632,5 +648,88 @@ class FaceTracker {
         this.ctx.shadowBlur = glowSize;
         this.ctx.stroke();
         this.ctx.shadowBlur = 0;
+    }
+
+    // Add new method for 3D head direction visualization
+    draw3DHeadDirection() {
+        const { size, position, colors } = this.headDirection;
+        const { pitch, yaw, roll } = this.headPose;
+
+        this.ctx.save();
+        this.ctx.translate(position.x, position.y);
+
+        // Convert angles to radians
+        const pitchRad = pitch * Math.PI / 180;
+        const yawRad = yaw * Math.PI / 180;
+        const rollRad = roll * Math.PI / 180;
+
+        // Draw 3D arrow
+        this.drawHeadArrow(size, pitchRad, yawRad, rollRad, colors);
+
+        // Add direction labels
+        this.drawDirectionLabels(size);
+
+        this.ctx.restore();
+    }
+
+    drawHeadArrow(size, pitch, yaw, roll, colors) {
+        // Draw base circle
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        this.ctx.lineWidth = 2;
+        this.ctx.arc(0, 0, size, 0, 2 * Math.PI);
+        this.ctx.stroke();
+
+        // Calculate 3D direction vector
+        const x = Math.sin(yaw) * Math.cos(pitch) * size;
+        const y = -Math.sin(pitch) * size;
+        const z = Math.cos(yaw) * Math.cos(pitch) * size;
+
+        // Project to 2D
+        const scale = 1 + z / (size * 2);  // Perspective scaling
+        const projX = x * scale;
+        const projY = y * scale;
+
+        // Draw main direction arrow
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = colors.forward;
+        this.ctx.lineWidth = 3;
+        this.ctx.shadowColor = colors.forward;
+        this.ctx.shadowBlur = 10;
+
+        // Draw arrow with perspective
+        this.ctx.moveTo(0, 0);
+        this.ctx.lineTo(projX, projY);
+        this.ctx.stroke();
+
+        // Draw arrow head
+        const headSize = 10 * scale;
+        const angle = Math.atan2(projY, projX);
+        this.ctx.beginPath();
+        this.ctx.moveTo(projX, projY);
+        this.ctx.lineTo(
+            projX - headSize * Math.cos(angle - Math.PI/6),
+            projY - headSize * Math.sin(angle - Math.PI/6)
+        );
+        this.ctx.moveTo(projX, projY);
+        this.ctx.lineTo(
+            projX - headSize * Math.cos(angle + Math.PI/6),
+            projY - headSize * Math.sin(angle + Math.PI/6)
+        );
+        this.ctx.stroke();
+
+        // Reset shadow
+        this.ctx.shadowBlur = 0;
+    }
+
+    drawDirectionLabels(size) {
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = '#FFFFFF';
+        
+        // Add direction labels with icons
+        this.ctx.fillText('↑ Up', -15, -size - 10);
+        this.ctx.fillText('← Left', -size - 40, 5);
+        this.ctx.fillText('Right →', size + 10, 5);
+        this.ctx.fillText('↓ Down', -20, size + 20);
     }
 } 
